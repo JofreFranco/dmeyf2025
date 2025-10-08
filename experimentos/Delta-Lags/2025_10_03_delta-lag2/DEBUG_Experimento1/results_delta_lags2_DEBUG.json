@@ -1,0 +1,70 @@
+{
+  "experiment_name": "delta_lags2_DEBUG",
+  "seeds": [
+    537919,
+    923347,
+    173629,
+    419351,
+    287887
+  ],
+  "hyperparameters": {
+    "num_leaves": 12,
+    "learning_rate": 0.09605651641702513,
+    "min_data_in_leaf": 9120,
+    "feature_fraction": 0.6269482909645826,
+    "bagging_fraction": 0.4955621454552221
+  },
+  "results_per_seed": [
+    {
+      "seed": 537919,
+      "auc": 0.5,
+      "ganancia": 864520000,
+      "best_iteration": 0,
+      "optimal_threshold": 0.01,
+      "threshold_gain": 864528845.1999998
+    },
+    {
+      "seed": 923347,
+      "auc": 0.5,
+      "ganancia": 864520000,
+      "best_iteration": 0,
+      "optimal_threshold": 0.01,
+      "threshold_gain": 864528845.1999998
+    },
+    {
+      "seed": 173629,
+      "auc": 0.5,
+      "ganancia": 864520000,
+      "best_iteration": 0,
+      "optimal_threshold": 0.01,
+      "threshold_gain": 864528845.1999998
+    },
+    {
+      "seed": 419351,
+      "auc": 0.5,
+      "ganancia": 864520000,
+      "best_iteration": 0,
+      "optimal_threshold": 0.01,
+      "threshold_gain": 864528845.1999998
+    },
+    {
+      "seed": 287887,
+      "auc": 0.5,
+      "ganancia": 864520000,
+      "best_iteration": 0,
+      "optimal_threshold": 0.01,
+      "threshold_gain": 864528845.1999998
+    }
+  ],
+  "average_metrics": {
+    "auc_mean": 0.5,
+    "auc_std": 0.0,
+    "gain_mean": 864520000.0,
+    "gain_std": 0.0,
+    "threshold_mean": 0.01,
+    "threshold_std": 0.0,
+    "threshold_gain_mean": 864528845.1999998,
+    "threshold_gain_std": 0.0
+  },
+  "ensemble_threshold": 0.01
+}

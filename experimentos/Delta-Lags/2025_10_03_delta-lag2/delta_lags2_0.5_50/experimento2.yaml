@@ -1,0 +1,38 @@
+data:
+  eval_month: 202106
+  test_month: 202105
+  train_months:
+  - 202101
+  - 202102
+  - 202103
+  - 202104
+experiment:
+  debug: false
+  n_trials: 50
+  name: delta_lags2
+  sample_ratio: 0.5
+  tag: '0.5_50'
+hyperparameters:
+  bagging_fraction:
+    max: 1.0
+    min: 0.01
+    type: float
+  feature_fraction:
+    max: 1.0
+    min: 0.01
+    type: float
+  learning_rate:
+    max: 0.3
+    min: 0.001
+    type: float
+  min_data_in_leaf:
+    max: 10000
+    min: 5
+    type: int
+  num_leaves:
+    max: 100
+    min: 8
+    type: int
+preprocessing:
+  lag_transformer:
+    n_lags: 1

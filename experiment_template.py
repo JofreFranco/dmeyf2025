@@ -1,0 +1,268 @@
+"""
+Template para experimentos de EyF
+Este archivo define la estructura estándar para todos los experimentos.
+Basado en la estructura actualizada de lags1.py
+
+Uso:
+    python experiment_name.py config.yaml [--debug | --no-debug]
+"""
+
+import argparse
+from datetime import datetime
+import gc
+import json
+from pathlib import Path
+from time import time
+
+from eyf.data.loading import load_and_prepare_data
+from eyf.data.splitting import split_train_test_eval
+from eyf.modeling.optimization import optimize_hyperparameters_with_optuna, save_trials
+from eyf.utils.files import process_experiment_predictions
+from eyf.utils.data_dict import RANDOM_SEEDS, EXCLUDE_COLS
+from eyf.utils.replicator import replicate_experiment
+from eyf.experiments import experiment_init
+
+# Importar transformadores según necesidades del experimento
+# Ejemplos:
+# from eyf.data.preprocessing import LagTransformer
+# from eyf.data.preprocessing import DeltaTransformer  
+# from eyf.data.preprocessing import PercentileTransformer
+
+
+def create_data_transformer(transformer_config):
+    """
+    Crear el transformador de datos según la configuración del experimento.
+    
+    Args:
+        transformer_config: Diccionario con la configuración del transformador
+        
+    Returns:
+        Transformador configurado
+        
+    Este método debe ser personalizado para cada tipo de experimento.
+    Ejemplos de configuración:
+    
+    # Para lags simples:
+    transformer_config = {'type': 'lag', 'n_lags': 3}
+    
+    # Para delta-lags:  
+    transformer_config = {'type': 'delta_lag', 'n_deltas': 2, 'n_lags': 2}
+    
+    # Para lags-percentiles:
+    transformer_config = {'type': 'lag_percentile', 'n_lags': 1, 'percentiles': [25, 50, 75, 90, 95]}
+    """
+    
+    transformer_type = transformer_config.get('type', 'lag')
+    
+    if transformer_type == 'lag':
+        from eyf.data.preprocessing import LagTransformer
+        return LagTransformer(n_lags=transformer_config.get('n_lags', 1))
+        
+    elif transformer_type == 'delta_lag':
+        from eyf.data.preprocessing import DeltaTransformer, LagTransformer
+        
+        class DeltaLagTransformer:
+            def __init__(self, n_deltas=1, n_lags=1):
+                self.delta_transformer = DeltaTransformer(n_deltas=n_deltas)
+                self.lag_transformer = LagTransformer(n_lags=n_lags)
+            
+            def fit(self, X, y=None):
+                self.delta_transformer.fit(X)
+                X_with_deltas = self.delta_transformer.transform(X)
+                self.lag_transformer.fit(X_with_deltas)
+                return self
+            
+            def transform(self, X):
+                X_transformed = self.delta_transformer.transform(X)
+                X_transformed = self.lag_transformer.transform(X_transformed)
+                return X_transformed
+                
+        return DeltaLagTransformer(
+            n_deltas=transformer_config.get('n_deltas', 1),
+            n_lags=transformer_config.get('n_lags', 1)
+        )
+        
+    elif transformer_type == 'lag_percentile':
+        from eyf.data.preprocessing import LagTransformer, PercentileTransformer
+        
+        class LagsPercentilesTransformer:
+            def __init__(self, n_lags=1, percentiles=[25, 50, 75, 90, 95]):
+                self.lag_transformer = LagTransformer(n_lags=n_lags)
+                self.percentile_transformer = PercentileTransformer(percentiles=percentiles)
+            
+            def fit(self, X, y=None):
+                self.lag_transformer.fit(X)
+                X_with_lags = self.lag_transformer.transform(X)
+                self.percentile_transformer.fit(X)
+                return self
+            
+            def transform(self, X):
+                X_transformed = self.lag_transformer.transform(X)
+                X_transformed = self.percentile_transformer.transform(X_transformed)
+                return X_transformed
+                
+        return LagsPercentilesTransformer(
+            n_lags=transformer_config.get('n_lags', 1),
+            percentiles=transformer_config.get('percentiles', [25, 50, 75, 90, 95])
+        )
+    
+    else:
+        raise ValueError(f"Tipo de transformador no soportado: {transformer_type}")
+
+
+def main(config_path, debug=None):
+    """
+    Función principal del experimento
+    
+    Args:
+        config_path: Ruta al archivo de configuración YAML
+        debug: Override del modo debug (None para usar valor del YAML)
+    """
+    
+    # Inicializar configuración del experimento
+    exp_config = experiment_init(config_path, debug, __file__)
+    
+    # Extraer variables de la configuración
+    DEBUG = exp_config['DEBUG']
+    SAMPLE_RATIO = exp_config['SAMPLE_RATIO']
+    n_trials = exp_config['n_trials']
+    experiment_name = exp_config['experiment_name']
+    experiment_dir = exp_config['experiment_dir']
+    hyperparameter_space = exp_config['hyperparameter_space']
+    train_months = exp_config['train_months']
+    test_month = exp_config['test_month']
+    eval_month = exp_config['eval_month']
+    raw_data_path = exp_config['raw_data_path']
+    target_data_path = exp_config['target_data_path']
+    
+    # Configuración específica del transformador (debe estar en el YAML)
+    transformer_config = exp_config.get('transformer_config', {'type': 'lag', 'n_lags': 1})
+    
+    date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    start_time = time()
+
+    print("=" * 70)
+    print(f"📅 {date_time}")
+    print("=" * 70)
+
+    # Cargar y preprocesar datos
+    print("📂 Cargando y preprocesando datos...")
+    data_transformer = create_data_transformer(transformer_config)
+    df = load_and_prepare_data(str(raw_data_path), str(target_data_path), data_transformer)
+    print(f"✅ Datos procesados: {df.shape[0]} filas, {df.shape[1]} columnas")
+
+    # Dividir datos y aplicar sampling
+    print("✂️ Dividiendo datos y aplicando sampling...")
+
+    feature_cols = [col for col in df.columns if col not in EXCLUDE_COLS]
+    feature_names = feature_cols.copy()
+
+    data_splits = split_train_test_eval(
+        df, train_months, test_month, eval_month, 
+        sample_ratio=SAMPLE_RATIO, debug_mode=DEBUG
+    )
+
+    # Extraer datos para optimización (con sampling)
+    X_train, y_train, w_train = data_splits['train']
+    X_test, y_test, w_test = data_splits['test']
+    X_eval, customer_id_eval = data_splits['eval']
+
+    if not DEBUG:
+        # Extraer datos completos para modelo final (sin sampling)
+        X_train_full, y_train_full, w_train_full = data_splits['train_full']
+    else:
+        X_train_full = None
+        y_train_full = None
+        w_train_full = None
+
+    print(f"📊 Train: {len(X_train)} registros")
+    print(f"📊 Test: {len(X_test)} registros") 
+    print(f"📊 Eval: {len(X_eval)} registros")
+    print(f"✅ Features: {X_train.shape[1]} columnas")
+
+    # Optimizar hiperparámetros con Optuna
+    print(f"🔍 Iniciando optimización bayesiana...")
+    study_name = f"{experiment_name}_optimization"
+
+    study = optimize_hyperparameters_with_optuna(
+        hyperparameter_space=hyperparameter_space,
+        X_train=X_train,
+        y_train=y_train, 
+        w_train=w_train,
+        n_trials=n_trials,
+        seed=RANDOM_SEEDS[0],
+        study_name=study_name,
+        # feval=lgb_gan_eval  # Descomentar para optimizar sobre ganancia
+    )
+
+    # Guardar hiperparámetros en JSON
+    best_params = study.best_params
+    json_filename = f"{experiment_name}.json"
+    json_path = experiment_dir / json_filename
+    with open(json_path, 'w') as f:
+        json.dump(best_params, f, indent=2, ensure_ascii=False)
+    print(f"💾 Hiperparámetros guardados en: {json_filename}")
+    save_trials(study, experiment_name, experiment_dir)
+    gc.collect()
+
+    # Ejecutar replicación con todas las semillas
+    print("\n🔄 Iniciando replicación con múltiples semillas...")
+    print(f"📊 Para optimización: {len(X_train)} registros con sampling")
+
+    results = replicate_experiment(
+        X_train, y_train, w_train,  # Datos con sampling para entrenar modelos individuales
+        X_test, y_test, w_test, 
+        X_eval, customer_id_eval,
+        working_dir=experiment_dir,
+        experiment_name=experiment_name,
+        feature_names=feature_names,
+        X_train_full=X_train_full,
+        y_train_full=y_train_full,
+        w_train_full=w_train_full
+    )
+    gc.collect()
+
+    # Mostrar resultados finales
+    print("=" * 70)
+    print(f"\n🎉 EXPERIMENTO COMPLETADO {experiment_name}! - {date_time}")
+    print("=" * 70)
+    print(f"📊 AUC promedio: {results['average_metrics']['auc_mean']:.4f} ± {results['average_metrics']['auc_std']:.4f}")
+    print(f"💰 Ganancia promedio: {results['average_metrics']['gain_mean']:,.0f} ± {results['average_metrics']['gain_std']:,.0f}")
+    print(f"🎯 Threshold optimizado: {results['average_metrics']['threshold_mean']:.4f} ± {results['average_metrics']['threshold_std']:.4f}")
+    print(f"🏆 Ganancia con threshold óptimo: {results['average_metrics']['threshold_gain_mean']:,.0f} ± {results['average_metrics']['threshold_gain_std']:,.0f}")
+
+    # Generar archivos de predicciones binarias
+    print("\n🎯 Generando predicciones binarias...")
+    # Usar threshold optimizado del ensemble
+    optimal_threshold = results.get('ensemble_threshold', 0.025)  # Fallback al threshold estándar
+    print(f"🎯 Usando threshold optimizado: {optimal_threshold:.4f}")
+
+    prediction_files = process_experiment_predictions(
+        experiment_dir=experiment_dir,
+        threshold=optimal_threshold,
+        experiment_name=experiment_name
+    )
+
+    print("\n📁 Archivos generados")
+    print(f"🕒 Tiempo de ejecución: {time() - start_time:.2f} segundos")
+    gc.collect()
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Ejecutar experimento con configuración YAML')
+    parser.add_argument('config_path', type=str, help='Ruta al archivo de configuración YAML')
+    debug_group = parser.add_mutually_exclusive_group()
+    debug_group.add_argument('--debug', action='store_true', 
+                             help='Forzar modo debug (sobrescribe YAML)')
+    debug_group.add_argument('--no-debug', action='store_true',
+                             help='Forzar modo no-debug (sobrescribe YAML)')
+    args = parser.parse_args()
+    
+    # Determinar valor del debug
+    debug_override = None
+    if args.debug:
+        debug_override = True
+    elif args.no_debug:
+        debug_override = False
+    
+    main(args.config_path, debug_override)
