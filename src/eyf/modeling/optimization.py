@@ -115,7 +115,7 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train, see
                 'gpu_device_id': 0,
                 'min_data_in_leaf': max(20, params.get('min_data_in_leaf', 20))  # GPU requiere más datos por hoja
             })
-        print(hyperparameter_space)
+        #print(hyperparameter_space)
         # Samplear hiperparámetros
         for param_name, (suggest_type, min_val, max_val) in hyperparameter_space.items():
             if suggest_type == 'int':
@@ -129,11 +129,15 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train, see
         train_data = lgb.Dataset(X_train, label=y_train, weight=w_train)
         
         try:
+            # Extraer parámetros especiales que no van directamente a LightGBM
+            early_stopping_rounds = params.pop('early_stopping_rounds', 50)
+            num_boost_round = params.pop('num_boost_round', 1000)
+            
             # Realizar cross-validation con timeout
             cv_results = lgb.cv(
                 params,
                 train_data,
-                num_boost_round=1000,
+                num_boost_round=num_boost_round,
                 folds=None,
                 nfold=n_folds,
                 stratified=True,
@@ -141,7 +145,7 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train, see
                 feval=feval,
                 seed=seed,
                 return_cvbooster=False,
-                callbacks=[lgb.early_stopping(50), lgb.log_evaluation(0)]
+                callbacks=[lgb.early_stopping(early_stopping_rounds), lgb.log_evaluation(0)]
             )
             
             # Obtener el mejor score

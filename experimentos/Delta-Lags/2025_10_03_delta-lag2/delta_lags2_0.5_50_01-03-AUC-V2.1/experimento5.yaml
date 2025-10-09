@@ -1,0 +1,49 @@
+data:
+  eval_month: 202106
+  test_month: 202104
+  train_months:
+  - 202101
+  - 202102
+  - 202103
+experiment:
+  debug: false
+  n_trials: 50
+  name: delta_lags2
+  sample_ratio: 0.5
+  tag: 0.5_50_01-03-AUC-V2.1
+hyperparameters:
+  bagging_fraction:
+    max: 1.0
+    min: 0.1
+    type: float
+  bagging_freq:
+    max: 2000
+    min: 20
+    type: int
+  early_stopping_rounds:
+    max: 50
+    min: 50
+    type: int
+  feature_fraction:
+    max: 1.0
+    min: 0.01
+    type: float
+  learning_rate:
+    max: 0.1
+    min: 0.005
+    type: float
+  min_data_in_leaf:
+    max: 1000
+    min: 1
+    type: int
+  num_boost_round:
+    max: 2000
+    min: 500
+    type: int
+  num_leaves:
+    max: 1000
+    min: 80
+    type: int
+preprocessing:
+  lag_transformer:
+    n_lags: 1

@@ -1,0 +1,47 @@
+# Configuración del experimento Experimento1
+experiment:
+  name: ""
+  tag: "0.5_50_01-03-AUC-V2.1"
+  debug: false
+  sample_ratio: 0.5
+  n_trials: 50
+
+hyperparameters:
+  bagging_freq:
+    type: "int"
+    min: 20
+    max: 2000
+  num_leaves:
+    type: "int"
+    min: 80
+    max: 1000
+  learning_rate:
+    type: "float" 
+    min: 0.005
+    max: 0.1
+  min_data_in_leaf:
+    type: "int"
+    min: 1
+    max: 1000
+  feature_fraction:
+    type: "float"
+    min: 0.01
+    max: 1.0
+  bagging_fraction:
+    type: "float"
+    min: 0.1
+    max: 1.0
+  num_boost_round:
+    type: "int"
+    min: 500
+    max: 2000
+  early_stopping_rounds:
+    type: "int"
+    min: 50
+    max: 50
+data:
+  train_months: [202101, 202102, 202103]
+  test_month: 202104
+  eval_month: 202106
+
+

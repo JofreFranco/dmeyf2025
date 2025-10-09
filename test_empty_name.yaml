@@ -1,0 +1,26 @@
+# Configuración de prueba con nombre vacío
+experiment:
+  name: ""  # Nombre vacío para probar validación
+  folder: "Experimento_Test"
+  debug: false
+  sample_ratio: 0.1
+  n_trials: 5
+
+hyperparameters:
+  num_leaves:
+    type: "int"
+    min: 8
+    max: 100
+  learning_rate:
+    type: "float" 
+    min: 0.001
+    max: 0.3
+
+data:
+  train_months: [202101, 202102, 202103, 202104]
+  test_month: 202105
+  eval_month: 202106
+
+preprocessing:
+  lag_transformer:
+    n_lags: 1

@@ -144,13 +144,19 @@ def train_model_single_seed(X_train, y_train, w_train, X_test, y_test, w_test,
     train_dataset = lgb.Dataset(X_train, label=y_train, weight=w_train)
     test_dataset = lgb.Dataset(X_test, label=y_test, reference=train_dataset, weight=w_test)
 
+    # Extraer parámetros especiales que no van directamente a LightGBM
+    params_copy = params_with_seed.copy()
+    early_stopping_rounds = params_copy.pop('early_stopping_rounds', 50)
+    num_boost_round = params_copy.pop('num_boost_round', 1000)
+
     modelo = lgb.train(
-        params_with_seed,
+        params_copy,
         train_dataset,
-        num_boost_round=params_with_seed.get('num_boost_round', 10000),
+        num_boost_round=num_boost_round,
         valid_sets=[test_dataset],
         valid_names=['test'],
         callbacks=[
+            lgb.early_stopping(early_stopping_rounds),
             lgb.log_evaluation(period=0)
         ],
         feval=lgb_gan_eval,
@@ -160,8 +166,8 @@ def train_model_single_seed(X_train, y_train, w_train, X_test, y_test, w_test,
 
     auc = calcular_auc(y_test, y_pred_test)
     # Convertir etiquetas binarias a clase ternaria para ganancia_prob
+    # Solo BAJA+2 es considerada positiva
     y_ternaria = np.where(y_test == 1, "BAJA+2", "CONTINUA")
-    print(y_ternaria)
     # Crear array 2D para ganancia_prob (columna 0: prob negativa, columna 1: prob positiva)
     y_hat_2d = np.column_stack([1 - y_pred_test, y_pred_test])
     
@@ -274,7 +280,7 @@ def replicate_experiment(X_train, y_train, w_train, X_test, y_test, w_test,
         })
         
         params_final = get_optimized_lgb_params(base_params_final, quiet=True)
-        print(params_final)
+        
         # Limpiar cualquier parámetro relacionado con early stopping
         params_final.pop('early_stopping_rounds', None)
         

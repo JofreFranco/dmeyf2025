@@ -43,13 +43,26 @@ def plot_feature_importance(model, feature_names=None, top_features=30,
         feature_names = [f'feature_{i}' for i in range(len(importance))]
     
     # Crear DataFrame con importancia
-    df_importance = pd.DataFrame({
+    df_importance_full = pd.DataFrame({
         'feature': feature_names,
         'importance': importance
     })
     
-    # Ordenar por importancia y tomar los top_features
-    df_importance = df_importance.sort_values('importance', ascending=False).head(top_features)
+    # Ordenar por importancia (de mayor a menor)
+    df_importance_full = df_importance_full.sort_values('importance', ascending=False)
+    
+    # Guardar CSV con TODAS las features ordenadas por importancia
+    if debug_mode:
+        csv_filename = f"{experiment_name}_feature_importance_DEBUG.csv"
+    else:
+        csv_filename = f"{experiment_name}_feature_importance.csv"
+    
+    csv_filepath = os.path.join(working_dir, csv_filename)
+    df_importance_full.to_csv(csv_filepath, index=False)
+    print(f"💾 CSV de importancia guardado: {csv_filepath}")
+    
+    # Tomar solo los top_features para el gráfico
+    df_importance = df_importance_full.head(top_features)
     
     # Configurar estilo
     plt.style.use('default')

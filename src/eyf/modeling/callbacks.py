@@ -33,6 +33,7 @@ def lgb_auc_eval(y_pred, data):
 def lgb_gan_eval(y_pred, data):
     """
     Función de evaluación personalizada para LightGBM que calcula ganancia.
+    Solo BAJA+2 es considerada como clase positiva.
     
     Parameters:
     -----------
@@ -52,7 +53,8 @@ def lgb_gan_eval(y_pred, data):
     y_pred_2d = [[1-p, p] for p in y_pred]
     
     # Convertir etiquetas binarias (0/1) a formato ternario para ganancia_prob
-    y_ternaria = ["CONTINUA" if label == 0 else "BAJA+1" for label in y_true]
+    # Solo BAJA+2 es considerada positiva (clase 1), BAJA+1 ahora es CONTINUA
+    y_ternaria = ["CONTINUA" if label == 0 else "BAJA+2" for label in y_true]
     
     # Calcular ganancia
     ganancia = ganancia_prob(y_pred_2d, y_ternaria, prop=1, class_index=1, threshold=0.025)

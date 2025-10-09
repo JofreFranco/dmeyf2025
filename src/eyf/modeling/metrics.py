@@ -177,8 +177,8 @@ def ganancia_prob(y_hat, y, prop=1, class_index=1, threshold=0.025):
     prob_positiva = y_hat[:, class_index] if y_hat.ndim > 1 else y_hat
     predicciones = (prob_positiva >= threshold).astype(int)
     
-    # Convertir etiquetas a binario (BAJA+1 y BAJA+2 son positivos)
-    y_binario = np.where((y == "BAJA+1") | (y == "BAJA+2"), 1, 0)
+    # Convertir etiquetas a binario (solo BAJA+2 es positivo)
+    y_binario = np.where(y == "BAJA+2", 1, 0)
     
     # Calcular matriz de confusión
     tp = np.sum((y_binario == 1) & (predicciones == 1))

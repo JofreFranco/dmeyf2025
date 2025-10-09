@@ -1,0 +1,70 @@
+{
+  "experiment_name": "lags1",
+  "seeds": [
+    537919,
+    923347,
+    173629,
+    419351,
+    287887
+  ],
+  "hyperparameters": {
+    "num_leaves": 99,
+    "learning_rate": 0.049127444355647754,
+    "min_data_in_leaf": 592,
+    "feature_fraction": 0.3127786728552202,
+    "bagging_fraction": 0.9892069128663966
+  },
+  "results_per_seed": [
+    {
+      "seed": 537919,
+      "auc": 0.8926627278690643,
+      "ganancia": 657380000,
+      "best_iteration": 0,
+      "optimal_threshold": 0.09000000000000001,
+      "threshold_gain": 1031657682.5999999
+    },
+    {
+      "seed": 923347,
+      "auc": 0.8906280575138236,
+      "ganancia": 663960000,
+      "best_iteration": 0,
+      "optimal_threshold": 0.09727272727272727,
+      "threshold_gain": 1027717175.5999999
+    },
+    {
+      "seed": 173629,
+      "auc": 0.8936522269109273,
+      "ganancia": 669560000,
+      "best_iteration": 0,
+      "optimal_threshold": 0.09545454545454546,
+      "threshold_gain": 1030177362.7999997
+    },
+    {
+      "seed": 419351,
+      "auc": 0.8938508984671338,
+      "ganancia": 664480000,
+      "best_iteration": 0,
+      "optimal_threshold": 0.09272727272727273,
+      "threshold_gain": 1027917432.9999998
+    },
+    {
+      "seed": 287887,
+      "auc": 0.8903446423376136,
+      "ganancia": 653400000,
+      "best_iteration": 0,
+      "optimal_threshold": 0.08636363636363636,
+      "threshold_gain": 1024177752.8
+    }
+  ],
+  "average_metrics": {
+    "auc_mean": 0.8922277106197125,
+    "auc_std": 0.001480409515871426,
+    "gain_mean": 661756000.0,
+    "gain_std": 5694775.1492047515,
+    "threshold_mean": 0.09236363636363636,
+    "threshold_std": 0.003882573909829567,
+    "threshold_gain_mean": 1028329481.3599999,
+    "threshold_gain_std": 2540596.053718913
+  },
+  "ensemble_threshold": 0.09236363636363636
+}
