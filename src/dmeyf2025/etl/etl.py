@@ -1,9 +1,8 @@
 import logging
-from typing import List, Union
-
+from os.path import exists
 import pandas as pd
 import os
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.pipeline import Pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -15,21 +14,27 @@ class ETL:
     Esta clase permite leer un archivo CSV, aplicar una serie de procesadores
     de sklearn y guardar el resultado procesado.
     """
-    
-    def __init__(self, csv_directory: str, processors: List[Union[BaseEstimator, TransformerMixin]]):
+
+    def __init__(self, csv_directory: str, pipeline: Pipeline, train_months: list, test_month: int, eval_month: int):
         """
         Inicializa la clase ETL.
         
         Args:
             csv_directory (str): Ruta al directorio del archivo CSV
-            processors (List[Union[BaseEstimator, TransformerMixin]]): 
-                Lista de procesadores de sklearn para aplicar a los datos
+            pipeline (Pipeline): Pipeline de sklearn para aplicar a los datos
         """
-        self.csv_directory = csv_directory
-        self.processors = processors
+        if exists(str(csv_directory).replace("crudo", "target")):
+            self.csv_directory = str(csv_directory).replace("crudo", "target")
+        else:
+            self.csv_directory = csv_directory
+            
+        self.pipeline = pipeline
         self.data = None
         self.processed_data = None
-        
+        self.DEBUG = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
+        self.train_months = train_months
+        self.test_month = test_month
+        self.eval_month = eval_month
     def read_file(self) -> pd.DataFrame:
         """
         Lee el archivo CSV desde el directorio especificado.
@@ -40,6 +45,13 @@ class ETL:
         Raises:
             FileNotFoundError: Si el archivo no existe
         """
+        if self.DEBUG:
+            csv_debug_directory = str(self.csv_directory).replace(".csv", "_debug.csv")
+            if exists(csv_debug_directory):
+                self.data = pd.read_csv(csv_debug_directory)
+                logger.info(f"Archivo leído exitosamente: {len(self.data)} filas, {len(self.data.columns)} columnas")
+                return self.data
+        
         if not os.path.exists(self.csv_directory):
             raise FileNotFoundError(f"El archivo {self.csv_directory} no existe")
         
@@ -50,10 +62,10 @@ class ETL:
 
         except Exception as e:
             raise Exception(f"Error al leer el archivo: {str(e)}")
-    
+
     def process_data(self) -> pd.DataFrame:
         """
-        Procesa los datos aplicando la lista de procesadores de sklearn.
+        Procesa los datos aplicando el pipeline de sklearn.
         
         Returns:
             pd.DataFrame: DataFrame con los datos procesados
@@ -64,43 +76,19 @@ class ETL:
         if self.data is None:
             raise ValueError("No hay datos cargados. Ejecuta leer_archivo() primero.")
         
-        # Hacer una copia de los datos para no modificar el original
-        self.processed_data = self.data.copy()
-        
-        # Aplicar cada procesador en secuencia
-        for i, processor in enumerate(self.processors):
-            try:
-                logger.info(f"Aplicando procesador {i+1}/{len(self.processors)}: {type(processor).__name__}")
-                
-                # Si el procesador tiene fit, lo ajustamos primero
-                if hasattr(processor, 'fit'):
-                    processor.fit(self.processed_data)
-                
-                # Aplicar la transformación
-                if hasattr(processor, 'transform'):
-                    transformed_data = processor.transform(self.processed_data)
-                    
-                    # Si la transformación devuelve un array numpy, convertirlo a DataFrame
-                    if hasattr(transformed_data, 'shape') and len(transformed_data.shape) == 2:
-                        # Mantener los nombres de las columnas si es posible
-                        if hasattr(processor, 'get_feature_names_out'):
-                            column_names = processor.get_feature_names_out()
-                        else:
-                            column_names = [f'feature_{j}' for j in range(transformed_data.shape[1])]
-                        
-                        self.processed_data = pd.DataFrame(
-                            transformed_data, 
-                            columns=column_names,
-                            index=self.processed_data.index
-                        )
-                    else:
-                        # Si no es un array 2D, intentar mantener como DataFrame
-                        self.processed_data = pd.DataFrame(transformed_data)
-                        
-            except Exception as e:
-                raise Exception(f"Error al aplicar el procesador {type(processor).__name__}: {str(e)}")
+        self.processed_data = self.pipeline.transform(self.data)
         
         logger.info(f"Procesamiento completado: {len(self.processed_data)} filas, {len(self.processed_data.columns)} columnas")
+        X_train, y_train, X_test, y_test, X_eval, y_eval = self.split_data()
+        logger.info(f"DataFrame train: {len(X_train)}")
+        logger.info(f"DataFrame test: {len(X_test)}")
+        logger.info(f"DataFrame eval: {len(X_eval)}")
+        return X_train, y_train, X_test, y_test, X_eval, y_eval
+    
+    def get_processed_data(self) -> pd.DataFrame:
+        """
+        Retorna los datos procesados.
+        """
         return self.processed_data
     
     def save_processed_file(self, output_path: str, index: bool = False) -> None:
@@ -127,6 +115,24 @@ class ETL:
             
         except Exception as e:
             raise Exception(f"Error al guardar el archivo: {str(e)}")
+    def split_data(self) -> pd.DataFrame:
+        """
+        Divide los datos en conjuntos de entrenamiento y prueba y kaggle.
+        Args:
+            train_months (list): Lista de meses de entrenamiento
+            test_month (int): Mes de prueba
+            eval_month (int): Mes de evaluación
+        Returns:
+            pd.DataFrame: DataFrame con los datos procesados
+        """
+        train_data = self.processed_data[self.processed_data['foto_mes'].isin(self.train_months)].copy()
+        test_data = self.processed_data[self.processed_data['foto_mes'] == self.test_month].copy()
+        eval_data = self.processed_data[self.processed_data['foto_mes'] == self.eval_month].copy()
+
+        X_train, y_train = train_data.drop(columns=["clase_ternaria"]), train_data["clase_ternaria"]
+        X_test, y_test = test_data.drop(columns=["clase_ternaria"]), test_data["clase_ternaria"]
+        X_eval, y_eval = eval_data.drop(columns=["clase_ternaria"]), eval_data["clase_ternaria"]
+        return X_train, y_train, X_test, y_test, X_eval, y_eval
     
     def execute_complete_pipeline(self, output_path: str = None, index: bool = False) -> pd.DataFrame:
         """
@@ -145,14 +151,20 @@ class ETL:
         self.read_file()
         
         # Procesar datos
-        self.process_data()
+        X_train, y_train, X_test, y_test, X_eval, y_eval = self.process_data()
         
         if output_path is not None:
             self.save_processed_file(output_path, index)
         
         logger.info("Pipeline ETL completado exitosamente!")
-        return self.processed_data
-if __name__ == "__main__":
+        return X_train, y_train, X_test, y_test, X_eval, y_eval
 
-    etl = ETL(csv_directory="./data/competencia_01_crudo.csv", processors=[])
-    etl.ejecutar_pipeline_completo(output_path="./data/competencia_01_procesado.csv")
+
+if __name__ == "__main__":
+    from sklearn.pipeline import Pipeline
+    
+    # Crear un pipeline vacío para el ejemplo
+    empty_pipeline = Pipeline(steps=[])
+    
+    etl = ETL(csv_directory="./data/competencia_01_crudo.csv", pipeline=empty_pipeline)
+    etl.execute_complete_pipeline(output_path="./data/competencia_01_procesado.csv")

@@ -3,6 +3,7 @@ Módulo de gestión de experimentos
 Proporciona funcionalidades para inicializar y configurar experimentos desde archivos YAML
 """
 
+import os
 import yaml
 import logging
 from pathlib import Path
@@ -72,8 +73,9 @@ def setup_logging(experiment_dir):
     ))
     logging.getLogger().addHandler(file_handler)
 
-def experiment_init(config_path, debug=None, script_file=None):
+def experiment_init(config_path, debug=False, script_file=None):
     """
+    # TODO: Esto debería ser una clase
     Inicializar configuración del experimento desde archivo YAML
     
     Args:
@@ -87,7 +89,7 @@ def experiment_init(config_path, debug=None, script_file=None):
     # Cargar configuración
     config = load_config(config_path)
     experiment_name = config['experiment'].get('name')
-    if debug is not None:
+    if debug:
         config['experiment']['debug'] = debug
         config['experiment']['commit'] = False
         config['experiment']['sample_ratio'] = 0.001
@@ -97,6 +99,9 @@ def experiment_init(config_path, debug=None, script_file=None):
     
     # Extraer variables de configuración
     DEBUG = config['experiment']['debug']
+    
+    # Setear variable de entorno para debug
+    os.environ['DEBUG_MODE'] = str(DEBUG)
     SAMPLE_RATIO = config['experiment']['sample_ratio']
     COMMIT = config['experiment']['commit']
     n_trials = config['experiment']['n_trials']
@@ -108,13 +113,18 @@ def experiment_init(config_path, debug=None, script_file=None):
     data_path = Path(config['experiment']['data_path'])
     raw_data_path = Path(config['experiment']['raw_data_path'])
     result_path = Path(config['experiment']['result_path'])
+    positive_classes = config['experiment']['positive_classes']
     if DEBUG:
         n_trials = 2
         experiment_name = f"DEBUG_{experiment_name}"
         experiment_folder = f"DEBUG_{experiment_folder}"
 
     experiment_dir = experiments_path / experiment_folder
-    experiment_dir.mkdir(parents=True, exist_ok=False)
+    if DEBUG:
+        print(experiment_dir)
+        experiment_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        experiment_dir.mkdir(parents=True, exist_ok=False)
 
 
     setup_logging(experiment_dir)
@@ -153,6 +163,7 @@ def experiment_init(config_path, debug=None, script_file=None):
         'result_path': result_path,
         'data_path': data_path,
         'experiments_path': experiments_path,
+        'positive_classes': positive_classes,
     }
 
 
