@@ -69,10 +69,12 @@ def experiment_init(config_path, debug=None, script_file=None):
     experiment_name = config['experiment'].get('name')
     if debug is not None:
         config['experiment']['debug'] = debug
+        config['experiment']['commit'] = False
     
     # Extraer variables de configuración
     DEBUG = config['experiment']['debug']
     SAMPLE_RATIO = config['experiment']['sample_ratio']
+    COMMIT = config['experiment']['commit']
     n_trials = config['experiment']['n_trials']
     n_init = config['experiment']['n_init']
     tag = config['experiment']['tag']
@@ -112,7 +114,8 @@ def experiment_init(config_path, debug=None, script_file=None):
         yaml.dump(config, file, default_flow_style=False, allow_unicode=True, indent=2)
     logger.info(f"📄 Archivo de configuración reescrito a: {config_destination}")
     
-    
+    if config['experiment']['commit']:
+        commit_experiment(experiment_dir, f"{experiment_name}_{tag}_{version}")
 
     hyperparameter_space = create_hyperparameter_space(config['hyperparameters'])
     weights = config.get('weights', {})

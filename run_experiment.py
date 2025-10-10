@@ -15,5 +15,6 @@ logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     logger.info("Iniciando experimento delta-lags2")
-    experiment_init('config.yaml', script_file=__file__)
+    experiment_init('config.yaml', script_file=__file__, debug=None)
     logger.info("Experimento completado")
+
