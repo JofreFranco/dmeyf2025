@@ -67,7 +67,6 @@ if __name__ == "__main__":
     logger.info(f"X_test_transformed.shape: {X_test_transformed.shape}")
     logger.info(f"X_eval_transformed.shape: {X_eval_transformed.shape}")
     
-    
     # Loggea todas las columnas, una por línea
     if False:
         logger.info("X_train_transformed.columns ({} columnas):\n{}".format(
@@ -115,7 +114,6 @@ if __name__ == "__main__":
     logger.info(f"💾 Hiperparámetros guardados en: {json_filename}")
     save_trials(study, experiment_path)
     gc.collect()
-
 
 
     logger.info(f"Experimento completado en {(time.time() - start_time)/60:.2f} minutos")

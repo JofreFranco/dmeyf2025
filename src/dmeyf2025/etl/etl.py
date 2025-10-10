@@ -15,7 +15,7 @@ class ETL:
     de sklearn y guardar el resultado procesado.
     """
 
-    def __init__(self, csv_directory: str, pipeline: Pipeline, train_months: list, test_month: int, eval_month: int):
+    def __init__(self, csv_directory: str, pipeline: Pipeline, train_months: list = None, test_month: int = None, eval_month: int = None):
         """
         Inicializa la clase ETL.
         
@@ -125,13 +125,22 @@ class ETL:
         Returns:
             pd.DataFrame: DataFrame con los datos procesados
         """
-        train_data = self.processed_data[self.processed_data['foto_mes'].isin(self.train_months)].copy()
-        test_data = self.processed_data[self.processed_data['foto_mes'] == self.test_month].copy()
-        eval_data = self.processed_data[self.processed_data['foto_mes'] == self.eval_month].copy()
+        if self.train_months is not None:
+            train_data = self.processed_data[self.processed_data['foto_mes'].isin(self.train_months)].copy()
+            X_train, y_train = train_data.drop(columns=["clase_ternaria"]), train_data["clase_ternaria"]
+        else:
+            X_train, y_train = None, None
+        if self.test_month is not None:
+            test_data = self.processed_data[self.processed_data['foto_mes'] == self.test_month].copy()
+            X_test, y_test = test_data.drop(columns=["clase_ternaria"]), test_data["clase_ternaria"]
+        else:
+            X_test, y_test = None, None
+        if self.eval_month is not None:
+            eval_data = self.processed_data[self.processed_data['foto_mes'] == self.eval_month].copy()
+            X_eval, y_eval = eval_data.drop(columns=["clase_ternaria"]), eval_data["clase_ternaria"]
+        else:
+            X_eval, y_eval = None, None
 
-        X_train, y_train = train_data.drop(columns=["clase_ternaria"]), train_data["clase_ternaria"]
-        X_test, y_test = test_data.drop(columns=["clase_ternaria"]), test_data["clase_ternaria"]
-        X_eval, y_eval = eval_data.drop(columns=["clase_ternaria"]), eval_data["clase_ternaria"]
         return X_train, y_train, X_test, y_test, X_eval, y_eval
     
     def execute_complete_pipeline(self, output_path: str = None, index: bool = False) -> pd.DataFrame:
