@@ -51,6 +51,26 @@ def create_hyperparameter_space(hyperparams_config):
         hyperparameter_space[param_name] = (param_type, param_min, param_max)
     return hyperparameter_space
 
+def write_config(config, experiment_dir):
+    """Escribir configuración del experimento en el directorio del experimento"""
+    with open(experiment_dir / "config.yaml", "w", encoding="utf-8") as file:
+        yaml.dump(config, file, default_flow_style=False, allow_unicode=True, indent=2)
+
+def write_logs(logs, experiment_dir):
+    """Escribir logs del experimento en el directorio del experimento"""
+    with open(experiment_dir / "logs.txt", "w", encoding="utf-8") as file:
+        file.write(logs)
+
+def setup_logging(experiment_dir):
+    """Configurar logging a archivo en el directorio del experimento"""
+    log_file = experiment_dir / "experiment.log"
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s | %(levelname)s | %(message)s',
+        datefmt='%H:%M:%S'
+    ))
+    logging.getLogger().addHandler(file_handler)
 
 def experiment_init(config_path, debug=None, script_file=None):
     """
@@ -92,35 +112,24 @@ def experiment_init(config_path, debug=None, script_file=None):
     experiment_dir = experiments_path / experiment_folder
     experiment_dir.mkdir(parents=True, exist_ok=False)
 
-    # Configurar logging a archivo en el directorio del experimento
-    log_file = experiment_dir / "experiment.log"
-    file_handler = logging.FileHandler(log_file, encoding='utf-8')
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s | %(levelname)s | %(message)s',
-        datefmt='%H:%M:%S'
-    ))
-    logging.getLogger().addHandler(file_handler)
+
+    setup_logging(experiment_dir)
     
     if DEBUG:
         logger.info(f"🚀 INICIANDO EXPERIMENTO {experiment_name} EN MODO DEBUG")
     else:
         logger.info(f"🚀 INICIANDO EXPERIMENTO {experiment_name}")
     
-    # Reescribir archivo de configuración al directorio del experimento
-    config_source = Path(config_path)
-    config_destination = experiment_dir / config_source.name
-    with open(config_destination, 'w', encoding='utf-8') as file:
-        yaml.dump(config, file, default_flow_style=False, allow_unicode=True, indent=2)
-    logger.info(f"📄 Archivo de configuración reescrito a: {config_destination}")
+    # Guardar configuración del experimento
+    write_config(config, experiment_dir)
     
+    # Hacer commit del experimento
     if config['experiment']['commit']:
         commit_experiment(experiment_dir, f"{experiment_name}_{tag}_{version}")
 
     hyperparameter_space = create_hyperparameter_space(config['hyperparameters'])
     weights = config.get('weights', {})
     
-    # Retornar configuración completa
     return {
         'config': config,
         'DEBUG': DEBUG,

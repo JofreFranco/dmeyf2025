@@ -12,7 +12,7 @@ experiment:
   data_path: "./data"
   raw_data_path: "./data/competencia_01_crudo.csv"
   result_path: "./results"
-  commit: True
+  commit: False
 
 hyperparameters:
   num_leaves:
