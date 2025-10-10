@@ -1,0 +1,49 @@
+data:
+  eval_month: 202106
+  test_month: 202104
+  train_months:
+  - 202101
+  - 202102
+experiment:
+  debug: false
+  description: Experimento Deltas y Lags de orden 2. Optimizando por ganancia, clase
+    positiva durante training = (BAJA+1 y BAJA+2). Escalado de hiperparámetros.
+  n_init: 20
+  n_trials: 50
+  name: DeltaLags2
+  sample_ratio: 0.5
+  tag: 0.5_50_01-02_G
+  version: 0.0.1
+hyperparameters:
+  bagging_fraction:
+    max: 1.0
+    min: 1.0
+    type: float
+  early_stopping_rounds:
+    max: 50
+    min: 50
+    type: int
+  feature_fraction:
+    max: 1.0
+    min: 0.01
+    type: float
+  learning_rate:
+    max: 0.1
+    min: 0.005
+    type: float
+  min_data_in_leaf:
+    max: 5000
+    min: 1
+    type: int
+  num_boost_round:
+    max: 10000
+    min: 100
+    type: int
+  num_leaves:
+    max: 1000
+    min: 80
+    type: int
+weights:
+  BAJA+1: 1
+  BAJA+2: 1
+  continue: 1
