@@ -1,10 +1,12 @@
 """
 Experimento delta-lags2: Evaluación de features con delta 2 y lag 2
 """
-import logging
 from datetime import datetime
-from dmeyf2025.experiments import experiment_init
+import logging
+import time
 
+from dmeyf2025.experiments import experiment_init
+from dmeyf2025.etl import ETL
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(levelname)s | %(message)s',
@@ -25,7 +27,11 @@ if __name__ == "__main__":
     🔧 Experiment folder: {experiment_config['experiment_folder']}
 {'=' * 70}""")
 
-    
+    start_time = time.time()
 
-    logger.info("Experimento completado")
+    #### ETL ####
+    etl = ETL(experiment_config['raw_data_path'], [])
+    etl.execute_complete_pipeline()
+
+    logger.info(f"Experimento completado en {(time.time() - start_time)/60:.2f} minutos")
 
