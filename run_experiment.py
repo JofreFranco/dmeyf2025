@@ -2,6 +2,8 @@
 Experimento delta-lags2: Evaluación de features con delta 2 y lag 2
 """
 from datetime import datetime
+import json
+import gc
 import logging
 import time
 import os
@@ -15,6 +17,7 @@ from dmeyf2025.processors.sampler import SamplerProcessor
 from dmeyf2025.processors.feature_processors import DeltaLagTransformer
 from dmeyf2025.modelling.optimization import create_optuna_objective
 from dmeyf2025.metrics.revenue import lgb_gan_eval
+from dmeyf2025.utils.save_study import save_trials
 
 logging.basicConfig(
     level=logging.INFO,
@@ -76,12 +79,14 @@ if __name__ == "__main__":
 
     train_final_dataset = lgb.Dataset(X_train_transformed_sampled, label=y_train_sampled)
 
+    logger.info("Iniciando optimización...")
+
+    start_time = time.time()
     study = optuna.create_study(
         direction='maximize',
         study_name=experiment_config['experiment_name'],
         sampler=optuna.samplers.TPESampler(seed=seeds[0], n_startup_trials=experiment_config["n_init"])
     )
-    
     # Crear función objetivo
     objective = create_optuna_objective(
         experiment_config["hyperparameter_space"], X_train, y_train, seed=seeds[0], feval=lgb_gan_eval,
@@ -89,6 +94,28 @@ if __name__ == "__main__":
     )
 
     study.optimize(objective, n_trials=experiment_config["n_trials"], n_jobs=-1)
+
+    # Mostrar resultados
+    total_time = time.time() - start_time
+
+    logger.info(f"\n✅ Optimización completada en {total_time/60:.1f} minutos")
+    logger.info(f"📊 Mejor ganancia: {study.best_value:.6f}")
+    logger.info("🎯 Mejores hiperparámetros:")
+    
+    for param, value in study.best_params.items():
+        logger.info(f"   {param}: {value}")
+
+    best_params = study.best_params
+    json_filename = f"best_params.json"
+    experiment_path = f"{experiment_config['experiments_path']}/{experiment_config['experiment_folder']}"
+    json_path = f"{experiment_path}/{json_filename}"
+    
+    with open(json_path, 'w') as f:
+        json.dump(best_params, f, indent=2, ensure_ascii=False)
+    logger.info(f"💾 Hiperparámetros guardados en: {json_filename}")
+    save_trials(study, experiment_path)
+    gc.collect()
+
 
 
     logger.info(f"Experimento completado en {(time.time() - start_time)/60:.2f} minutos")
