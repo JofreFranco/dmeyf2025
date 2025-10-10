@@ -90,6 +90,10 @@ def experiment_init(config_path, debug=None, script_file=None):
     if debug is not None:
         config['experiment']['debug'] = debug
         config['experiment']['commit'] = False
+        config['experiment']['sample_ratio'] = 0.001
+        config['experiment']['n_trials'] = 2
+        config['experiment']['n_init'] = 1
+        config['experiment']['seeds'] = config['experiment']['seeds'][:1]
     
     # Extraer variables de configuración
     DEBUG = config['experiment']['debug']

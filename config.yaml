@@ -13,6 +13,7 @@ experiment:
   raw_data_path: "./data/competencia_01_crudo.csv"
   result_path: "./results"
   commit: False
+  seeds: [537919, 923347, 173629, 419351, 287887]
 
 hyperparameters:
   num_leaves:
