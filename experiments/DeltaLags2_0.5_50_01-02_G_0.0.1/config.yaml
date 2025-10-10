@@ -5,6 +5,7 @@ data:
   - 202101
   - 202102
 experiment:
+  commit: true
   data_path: ./data
   debug: false
   description: Experimento Deltas y Lags de orden 2. Optimizando por ganancia, clase
