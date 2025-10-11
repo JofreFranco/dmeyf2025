@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 ########## MAIN ##########
 if __name__ == "__main__":
-    experiment_config = experiment_init('config.yaml', script_file=__file__, debug=False)
+    experiment_config = experiment_init('config.yaml', script_file=__file__, debug=True)
     DEBUG = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
     date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     seeds = experiment_config["seeds"]
@@ -224,25 +224,45 @@ if __name__ == "__main__":
 
     #### Final Modeling ####
     logger.info("Iniciando Modelado final...")
+
     if not DEBUG:
         X_final_train = pd.concat([X_train, X_test])
         y_final_train = np.concatenate([y_train, y_test])
     else:
         X_final_train = X_train_sampled
         y_final_train = y_train_sampled
+
     logger.info(f"X_train.shape antes de transformar: {X_final_train.shape}")
 
     # Transformamos target y features
     X_final_train, y_final_train = target_processor.transform(X_final_train, y_final_train)
     X_final_train = delta_lag_transformer.transform(X_final_train)
-
     logger.info(f"X_train.shape después de transformar: {X_final_train.shape}")
-    logger.info(f"Comenzando entrenamiento con hiperparámetros: {best_params}")
-    # Entrenamos modelo
-    train_final_dataset = lgb.Dataset(X_final_train, label=y_final_train)
-    model = lgb.train(best_params, train_final_dataset)
-    y_pred = model.predict(X_final_train)
-    auc = roc_auc_score(y_final_train, y_pred)
-    revenue = revenue_from_prob(y_pred, y_final_train)
+
+    n_seeds = len(seeds)
+    y_preds = []
+    
+    logger.info(f"Entrenando y prediciendo con {n_seeds} seeds para ensamblado...")
+    for i, seed in enumerate(seeds):
+        best_params_seed = best_params.copy()
+        best_params_seed["seed"] = seed
+
+        logger.info(f"[Seed {seed}] Entrenando modelo final")
+        train_final_dataset = lgb.Dataset(X_final_train, label=y_final_train)
+        model = lgb.train(best_params_seed, train_final_dataset)
+        y_pred = model.predict(X_eval_transformed)
+        y_preds.append(y_pred)
+
+    y_preds = np.stack(y_preds)
+    y_pred_ensemble = np.mean(y_preds, axis=0)
+    # Save ensemble predictions to a CSV in the experiment folder
+    prediction_df = pd.DataFrame({
+        "numero_de_cliente": X_eval_transformed.index if hasattr(X_eval_transformed, "index") else np.arange(len(y_pred_ensemble)),
+        "predicted_probability": y_pred_ensemble
+    })
+    prediction_file = os.path.join(experiment_path, "ensemble_predictions.csv")
+    prediction_df.to_csv(prediction_file, index=False)
+    logger.info(f"Predicciones de ensamblado guardadas en: {prediction_file}")
+
     logger.info(f"Experimento completado en {(time.time() - start_time)/60:.2f} minutos")
 
