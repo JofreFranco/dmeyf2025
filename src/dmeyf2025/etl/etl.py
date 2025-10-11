@@ -80,9 +80,12 @@ class ETL:
         
         logger.info(f"Procesamiento completado: {len(self.processed_data)} filas, {len(self.processed_data.columns)} columnas")
         X_train, y_train, X_test, y_test, X_eval, y_eval = self.split_data()
-        logger.info(f"DataFrame train: {len(X_train)}")
-        logger.info(f"DataFrame test: {len(X_test)}")
-        logger.info(f"DataFrame eval: {len(X_eval)}")
+        if X_train is not None:
+            logger.info(f"DataFrame train: {len(X_train)}")
+        if X_test is not None:
+            logger.info(f"DataFrame test: {len(X_test)}")
+        if X_eval is not None:
+            logger.info(f"DataFrame eval: {len(X_eval)}")
         return X_train, y_train, X_test, y_test, X_eval, y_eval
     
     def get_processed_data(self) -> pd.DataFrame:

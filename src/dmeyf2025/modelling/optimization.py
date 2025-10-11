@@ -78,13 +78,11 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
                 callbacks=[lgb.early_stopping(early_stopping_rounds), lgb.log_evaluation(0)]
             )
 
-            # Obtener el mejor score
+
             metric_scores = cv_results[f'valid {metric_name}-mean']
             best_score = max(metric_scores)
 
             best_iteration = len(metric_scores)
-            
-            # Guardar el número real de iteraciones usadas como atributo del trial
             trial.set_user_attr('actual_num_boost_round', best_iteration)
             
             return best_score

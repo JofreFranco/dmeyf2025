@@ -43,6 +43,7 @@ def revenue_from_prob(y_pred, y_true, n_envios=10000):
 
 
 def lgb_gan_eval(y_pred, data):
+
     """
     Función de evaluación personalizada para LightGBM que calcula ganancia.
     Solo BAJA+2 es considerada como clase positiva.
@@ -70,3 +71,21 @@ def lgb_gan_eval(y_pred, data):
     ganancia = revenue_from_prob(y_pred, y_ternaria)
 
     return 'gan', ganancia, True
+
+def sends_optimization(y_pred, y_true, min_sends, max_sends):
+    """
+    Función que optimiza la cantidad de envíos para maximizar la ganancia.
+    """
+    y_pred = np.array(y_pred)
+    y_true = np.array(y_true)
+    
+    # Convertir etiquetas binarias (0/1) a formato ternario para ganancia_prob
+    y_ternaria = ["CONTINUA" if label == 0 else "BAJA+2" for label in y_true]
+    max_ganancia = -np.inf
+    # Calcular ganancia usando las probabilidades directamente
+    for n_sends in range(min_sends, max_sends):
+        ganancia = revenue_from_prob(y_pred, y_ternaria, n_sends)
+        if ganancia > max_ganancia:
+            max_ganancia = ganancia
+            best_n_sends = n_sends
+    return best_n_sends

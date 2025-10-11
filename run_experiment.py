@@ -22,6 +22,7 @@ from dmeyf2025.processors.feature_processors import DeltaLagTransformer
 from dmeyf2025.modelling.optimization import create_optuna_objective
 from dmeyf2025.metrics.revenue import lgb_gan_eval, revenue_from_prob
 from dmeyf2025.utils.save_study import save_trials
+from dmeyf2025.modelling.train_model import train_models
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,7 +36,13 @@ logger = logging.getLogger(__name__)
 
 ########## MAIN ##########
 if __name__ == "__main__":
-    experiment_config = experiment_init('config.yaml', script_file=__file__, debug=True)
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run experiment with specified config file.")
+    parser.add_argument('--config', type=str, default='config1.yaml', help='YAML config file to load')
+    args = parser.parse_args()
+    config_file = args.config
+    experiment_config = experiment_init(config_file, script_file=__file__, debug=True)
     DEBUG = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
     date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     seeds = experiment_config["seeds"]
@@ -52,24 +59,19 @@ if __name__ == "__main__":
     """
     Lee los datos, calcula target ternario, y divide en train, test y eval.
     """
-    etl = ETL(experiment_config['raw_data_path'], CreateTargetProcessor(), experiment_config['config']['data']['train_months'], experiment_config['config']['data']['test_month'], experiment_config['config']['data']['eval_month'])
-    X_train, y_train, X_test, y_test, X_eval, y_eval = etl.execute_complete_pipeline()
+    etl = ETL(experiment_config['raw_data_path'], CreateTargetProcessor(), train_months = [202101, 202102, 202103, 202104, 202105, 202106],)
+    X, y, _,_,_,_ = etl.execute_complete_pipeline()
+    
     
     #### TRAIN PROCESSING ####
     target_processor = BinaryTargetProcessor(experiment_config['config']['experiment']['positive_classes'])
-    X_train, y_train = target_processor.fit_transform(X_train, y_train)
-    sampler_processor = SamplerProcessor(experiment_config['SAMPLE_RATIO'])
-    X_train_sampled, y_train_sampled = sampler_processor.fit_transform(X_train, y_train)
+    X, y = target_processor.fit_transform(X, y)
+    X["label"] = y
 
     #### Features ####
     delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2)
-    X_train_transformed_sampled = delta_lag_transformer.fit_transform(X_train_sampled)
-    X_test_transformed = delta_lag_transformer.transform(X_test)
-    X_eval_transformed = delta_lag_transformer.transform(X_eval)
-
-    logger.info(f"X_train_transformed.shape: {X_train_transformed_sampled.shape}")
-    logger.info(f"X_test_transformed.shape: {X_test_transformed.shape}")
-    logger.info(f"X_eval_transformed.shape: {X_eval_transformed.shape}")
+    X_transformed = delta_lag_transformer.fit_transform(X)
+    logger.info(f"X_transformed.shape: {X_transformed.shape}")
     
     # Loggea todas las columnas, una por línea
     if False:
@@ -77,9 +79,15 @@ if __name__ == "__main__":
             len(X_train_transformed_sampled.columns),
             "\n".join(X_train_transformed_sampled.columns)
         ))
-    
-    #### MODELING ####
-
+    X_train = X_transformed[X_transformed["foto_mes"].isin(experiment_config['train_months'])]
+    y_train = X_train["label"]
+    X_train = X_train.drop(columns=["label"])
+    X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])]
+    X_eval = X_eval.drop(columns=["label"])
+    X_test = X_transformed[X_transformed["foto_mes"].isin([experiment_config['test_month']])]
+    #### OPTIMIZACIÓN DE HIPERPARÁMETROS ####
+    sampler_processor = SamplerProcessor(experiment_config['SAMPLE_RATIO'])
+    X_train_sampled, y_train_sampled = sampler_processor.fit_transform(X_train, y_train)
     params = {
             'metric': ['auc', 'binary_logloss'],
             'objective': 'binary',
@@ -104,7 +112,7 @@ if __name__ == "__main__":
     )
     # Crear función objetivo
     objective = create_optuna_objective(
-        experiment_config["hyperparameter_space"], X_train_transformed_sampled, y_train_sampled, seed=seeds[0], feval=lgb_gan_eval,
+        experiment_config["hyperparameter_space"], X_train_sampled, y_train_sampled, seed=seeds[0], feval=lgb_gan_eval,
         params=params,
     )
 
@@ -131,7 +139,7 @@ if __name__ == "__main__":
     best_params['num_boost_round'] = actual_num_boost_round
     
     logger.info(f"🎯 Número real de iteraciones usadas: {actual_num_boost_round}")
-    
+
     json_filename = f"best_params.json"
     experiment_path = f"{experiment_config['experiments_path']}/{experiment_config['experiment_folder']}"
     json_path = f"{experiment_path}/{json_filename}"
@@ -142,127 +150,58 @@ if __name__ == "__main__":
     save_trials(study, experiment_path)
     gc.collect()
 
-    ### EVALUATION ###
-    if X_test.shape[0] > 0:
-        if DEBUG:
-            X_test_transformed = X_train_transformed_sampled
-            y_test = y_train_sampled
-
-
-        auc_scores = []
-        logloss_scores = []
-        revenue_scores = []
-        all_predictions = []
-        all_true = []
-        n_seeds = len(seeds)
-
-        logger.info("Iniciando evaluación sobre todas las seeds...")
-        start_time_eval = time.time()
-
-        for i, seed in enumerate(seeds):
-            logger.info(f"Seed {i+1}/{n_seeds} ({seed})")
-
-            # Ajustamos la seed en los parámetros
-            eval_params = dict(best_params)
-            eval_params["seed"] = seed
-
-            # Entrenar modelo
-            train_final_dataset = lgb.Dataset(X_train_transformed_sampled, label=y_train_sampled)
-            test_dataset = lgb.Dataset(X_test_transformed, label=y_test)
-            model = lgb.train(eval_params, train_final_dataset, valid_sets=[test_dataset])
-            y_pred = model.predict(X_test_transformed)
-
-            auc = roc_auc_score(y_test, y_pred)
-            revenue = revenue_from_prob(y_pred, y_test)
-            try:
-                logloss = log_loss(y_test, y_pred, labels=[0,1])
-            except:
-                logloss = None
-
-            auc_scores.append(auc)
-            revenue_scores.append(revenue)
-            logloss_scores.append(logloss)
-            all_predictions.append(y_pred)
-            all_true.append(y_test)
-
-            logger.info(f"Seed {seed} - AUC: {auc:.6f}, Revenue: {revenue:.2f}, LogLoss: {logloss if logloss is not None else 'N/A'}")
-
-        total_eval_time = time.time() - start_time_eval
-
-        # Agrupar predicciones y etiquetas verdaderas (por seed)
-        all_predictions = np.stack(all_predictions)
-        all_true = np.stack(all_true)
-
-        logger.info(f"Evaluación completada en {total_eval_time:.2f} segundos sobre {n_seeds} seeds.")
-        logger.info(f"AUC promedio: {np.mean(auc_scores):.6f} ± {np.std(auc_scores):.6f}")
-        logger.info(f"Revenue promedio: {np.mean(revenue_scores):.2f} ± {np.std(revenue_scores):.2f}")
-
-        # Si todos los logloss son calculables, reportar también
-        logloss_valid = [x for x in logloss_scores if x is not None]
-        if len(logloss_valid) > 0:
-            logger.info(f"LogLoss promedio: {np.mean(logloss_valid):.6f} ± {np.std(logloss_valid):.6f}")
-        else:
-            logger.warning("No se pudo calcular LogLoss en ninguna seed.")
-        
-        # Ensamblar las predicciones promediando la probabilidad
-        y_pred_ensemble = np.mean(all_predictions, axis=0)        
-        logger.info(f"Evaluación del ensamblado de predicciones (promedio de probabilidad):")
-        try:
-            auc_ensemble = roc_auc_score(all_true[0], y_pred_ensemble)
-        except:
-            auc_ensemble = None
-        revenue_ensemble = revenue_from_prob(y_pred_ensemble, all_true[0])
-        try:
-            logloss_ensemble = log_loss(all_true[0], y_pred_ensemble, labels=[0,1])
-        except:
-            logloss_ensemble = None
-
-        logger.info(f"[Ensamble] AUC: {auc_ensemble if auc_ensemble is not None else 'N/A'}")
-        logger.info(f"[Ensamble] Revenue: {revenue_ensemble:.2f}")
-        logger.info(f"[Ensamble] LogLoss: {logloss_ensemble if logloss_ensemble is not None else 'N/A'}")
-
-
-    #### Final Modeling ####
+    #### Final Modeling #######################################
+    ###########################################################
     logger.info("Iniciando Modelado final...")
 
     if not DEBUG:
-        X_final_train = pd.concat([X_train, X_test])
-        y_final_train = np.concatenate([y_train, y_test])
+        X_final_train = X_train
+        y_final_train = y_train
     else:
         X_final_train = X_train_sampled
         y_final_train = y_train_sampled
 
-    logger.info(f"X_train.shape antes de transformar: {X_final_train.shape}")
-
-    # Transformamos target y features
-    X_final_train, y_final_train = target_processor.transform(X_final_train, y_final_train)
-    X_final_train = delta_lag_transformer.transform(X_final_train)
-    logger.info(f"X_train.shape después de transformar: {X_final_train.shape}")
-
+    logger.info(f"X_train.shape final training: {X_final_train.shape}")
     n_seeds = len(seeds)
-    y_preds = []
-    
     logger.info(f"Entrenando y prediciendo con {n_seeds} seeds para ensamblado...")
-    for i, seed in enumerate(seeds):
-        best_params_seed = best_params.copy()
-        best_params_seed["seed"] = seed
+    
+    predictions,models = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
 
-        logger.info(f"[Seed {seed}] Entrenando modelo final")
-        train_final_dataset = lgb.Dataset(X_final_train, label=y_final_train)
-        model = lgb.train(best_params_seed, train_final_dataset)
-        y_pred = model.predict(X_eval_transformed)
-        y_preds.append(y_pred)
+    #OPTIMIZACIÓN DE ENVÍOS
+    if False:
+        logger.info("Iniciando optimización de envíos...")
+        min_sends = 1000
+        max_sends = 30000
+        best_n_sends = []
+        for model in models:
+            y_pred = model.predict(X_train)
+            best_sends = sends_optimization(y_pred, y_train, min_sends, max_sends)
+            best_n_sends.append(best_sends)
 
-    y_preds = np.stack(y_preds)
-    y_pred_ensemble = np.mean(y_preds, axis=0)
-    # Save ensemble predictions to a CSV in the experiment folder
-    prediction_df = pd.DataFrame({
-        "numero_de_cliente": X_eval_transformed.index if hasattr(X_eval_transformed, "index") else np.arange(len(y_pred_ensemble)),
-        "predicted_probability": y_pred_ensemble
-    })
-    prediction_file = os.path.join(experiment_path, "ensemble_predictions.csv")
-    prediction_df.to_csv(prediction_file, index=False)
-    logger.info(f"Predicciones de ensamblado guardadas en: {prediction_file}")
+        logger.info(f"🎯 Mejor número de envíos: {np.mean(best_n_sends)} ± {np.std(best_n_sends)}")
+        n_sends = int(np.mean(best_n_sends))
+    else:
+        n_sends = 11500
+    ####
+    
+    ones = np.ones(n_sends, dtype=int)
+    zeros = np.zeros(len(predictions)-n_sends, dtype=int)
+    sends = np.concatenate([ones, zeros])
+    predictions["predicted"] = sends
+    predictions[["numero_de_cliente", "predicted"]].to_csv(f"{experiment_path}/{experiment_config["experiment_folder"]}_ensemble_predictions.csv", index=False)
+
+    #### Final Modeling Con Escalado de Hiperparámetros ####
+    ########################################################
+    logger.info("Iniciando Modelado final con escalado de hiperparámetros...")
+    best_params["min_data_in_leaf"] = int(best_params["min_data_in_leaf"]/experiment_config['SAMPLE_RATIO'])
+    
+    predictions,models = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
+
+    ones = np.ones(n_sends, dtype=int)
+    zeros = np.zeros(len(predictions)-n_sends, dtype=int)
+    sends = np.concatenate([ones, zeros])
+    predictions["predicted"] = sends
+    predictions[["numero_de_cliente", "predicted"]].to_csv(f"{experiment_path}/{experiment_config["experiment_folder"]}_ensemble_predictions_hpscaled.csv", index=False)
 
     logger.info(f"Experimento completado en {(time.time() - start_time)/60:.2f} minutos")
 
