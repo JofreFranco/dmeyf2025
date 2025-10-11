@@ -6,7 +6,7 @@ from dmeyf2025.metrics.revenue import lgb_gan_eval
 
 logger = logging.getLogger(__name__)
 
-def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = None, seed=None, n_folds=5, feval=None):
+def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = None, seed=None, n_folds=5, feval=None, params=None):
     """
     Crea la función objetivo para Optuna.
     
@@ -33,7 +33,7 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
         Función objetivo para Optuna
     """
 
-    
+    logger.info(f"Training dataset shape: {X_train.shape}")
     # Determinar nombre de métrica desde feval
     if hasattr(feval, '__name__'):
         metric_name = feval.__name__.replace('lgb_', '').replace('_eval', '')
@@ -45,19 +45,7 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
         trial_start_time = time.time()
         
         # Configurar parámetros base con optimizaciones de hardware
-        params = {
-            'metric': ['auc', 'binary_logloss'],
-            'objective': 'binary',
-            'boosting_type': 'gbdt',
-            'verbose': -1,
-            'device_type': "CPU",  # CPU o GPU
-            'num_threads': 10,
-            'force_row_wise': True,
-            'max_bin': 31,
-            'max_cat_threshold': 32,             # Threshold para categorías automáticas
-            'cat_smooth': 10,                    # Smoothing para features categóricas
-            'seed': seed or 42
-        }
+        
 
         for param_name, (suggest_type, min_val, max_val) in hyperparameter_space.items():
             if suggest_type == 'int':
@@ -94,6 +82,11 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
             metric_scores = cv_results[f'valid {metric_name}-mean']
             best_score = max(metric_scores)
 
+            best_iteration = len(metric_scores)
+            
+            # Guardar el número real de iteraciones usadas como atributo del trial
+            trial.set_user_attr('actual_num_boost_round', best_iteration)
+            
             return best_score
             
         except Exception as e:

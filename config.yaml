@@ -39,7 +39,7 @@ hyperparameters:
     max: 1.0
   num_boost_round:
     type: "int"
-    min: 100
+    min: 10000
     max: 10000
   early_stopping_rounds:
     type: "int"

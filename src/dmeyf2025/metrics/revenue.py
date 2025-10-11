@@ -1,7 +1,7 @@
 import numpy as np
 from dmeyf2025.utils.data_dict import GANANCIA_ACIERTO, COSTO_ESTIMULO
 
-def revenue_from_prob(y_pred, y_true, n_envios=110):
+def revenue_from_prob(y_pred, y_true, n_envios=10000):
     """
     Calcula la ganancia esperada enviando estímulos a los N clientes con mayor probabilidad.
     
