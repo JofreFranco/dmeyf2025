@@ -23,6 +23,7 @@ from dmeyf2025.modelling.optimization import create_optuna_objective
 from dmeyf2025.metrics.revenue import lgb_gan_eval, revenue_from_prob
 from dmeyf2025.utils.save_study import save_trials
 from dmeyf2025.modelling.train_model import train_models
+from dmeyf2025.processors.eval_processors import scale
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,7 +43,7 @@ if __name__ == "__main__":
     parser.add_argument('--config', type=str, default='config1.yaml', help='YAML config file to load')
     args = parser.parse_args()
     config_file = args.config
-    experiment_config = experiment_init(config_file, script_file=__file__, debug=True)
+    experiment_config = experiment_init(config_file, script_file=__file__, debug=False)
     DEBUG = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
     date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     seeds = experiment_config["seeds"]
@@ -160,7 +161,8 @@ if __name__ == "__main__":
     else:
         X_final_train = X_train_sampled
         y_final_train = y_train_sampled
-
+    X_final_train.set_index("numero_de_cliente", inplace=True)
+    X_eval.set_index("numero_de_cliente", inplace=True)
     logger.info(f"X_train.shape final training: {X_final_train.shape}")
     n_seeds = len(seeds)
     logger.info(f"Entrenando y prediciendo con {n_seeds} seeds para ensamblado...")
@@ -190,6 +192,50 @@ if __name__ == "__main__":
     predictions["predicted"] = sends
     predictions[["numero_de_cliente", "predicted"]].to_csv(f"{experiment_path}/{experiment_config["experiment_folder"]}_ensemble_predictions.csv", index=False)
 
+    
+    
+    # Scale median
+    X_scaled = scale(X, strategy="median")
+    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2)
+    X_transformed = delta_lag_transformer.fit_transform(X_scaled)
+    X_transformed.set_index("numero_de_cliente", inplace=True)
+    X_transformed.loc[:, "label"] = y
+    X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])]
+    X_eval = X_eval.drop(columns=["label"])
+    print(set(X_final_train.columns) - set(X_eval.columns))
+    logger.info(f"X_eval.shape: {X_eval.shape}")
+    logger.info(f"X_train.shape: {X_final_train.shape}")
+
+    predictions = pd.DataFrame()
+    for n, model in enumerate(models):
+        predictions["numero_de_cliente"] = X_eval.index
+        y_pred = model.predict(X_eval)
+        predictions[f"pred_{n}"] = y_pred
+    ones = np.ones(n_sends, dtype=int)
+    zeros = np.zeros(len(predictions)-n_sends, dtype=int)
+    sends = np.concatenate([ones, zeros])
+    predictions["predicted"] = sends
+    predictions[["numero_de_cliente", "predicted"]].to_csv(f"{experiment_path}/{experiment_config["experiment_folder"]}_ensemble_predictions_scaled_median.csv", index=False)
+    # Scale mean
+    X_scaled = scale(X, strategy="mean")
+    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2)
+    X_transformed = delta_lag_transformer.fit_transform(X_scaled)
+    X_transformed.set_index("numero_de_cliente", inplace=True)
+    X_transformed.loc[:, "label"] = y
+    X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])]
+    X_eval = X_eval.drop(columns=["label"])
+
+    predictions = pd.DataFrame()
+    for n, model in enumerate(models):
+        predictions["numero_de_cliente"] = X_eval.index
+        y_pred = model.predict(X_eval)
+        predictions[f"pred_{n}"] = y_pred
+    ones = np.ones(n_sends, dtype=int)
+    zeros = np.zeros(len(predictions)-n_sends, dtype=int)
+    sends = np.concatenate([ones, zeros])
+    predictions["predicted"] = sends
+    predictions[["numero_de_cliente", "predicted"]].to_csv(f"{experiment_path}/{experiment_config["experiment_folder"]}_ensemble_predictions_scaled_mean.csv", index=False)
+
     #### Final Modeling Con Escalado de Hiperparámetros ####
     ########################################################
     logger.info("Iniciando Modelado final con escalado de hiperparámetros...")
@@ -203,5 +249,45 @@ if __name__ == "__main__":
     predictions["predicted"] = sends
     predictions[["numero_de_cliente", "predicted"]].to_csv(f"{experiment_path}/{experiment_config["experiment_folder"]}_ensemble_predictions_hpscaled.csv", index=False)
 
+
+    # Scale median
+    X_scaled = scale(X, strategy="median")
+    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2)
+    X_transformed = delta_lag_transformer.fit_transform(X_scaled)
+    X_transformed.set_index("numero_de_cliente", inplace=True)
+    X_transformed.loc[:, "label"] = y
+    X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])]
+    X_eval = X_eval.drop(columns=["label"])
+
+    predictions = pd.DataFrame()
+    for n, model in enumerate(models):
+        predictions["numero_de_cliente"] = X_eval.index
+        y_pred = model.predict(X_eval)
+        predictions[f"pred_{n}"] = y_pred
+    ones = np.ones(n_sends, dtype=int)
+    zeros = np.zeros(len(predictions)-n_sends, dtype=int)
+    sends = np.concatenate([ones, zeros])
+    predictions["predicted"] = sends
+    predictions[["numero_de_cliente", "predicted"]].to_csv(f"{experiment_path}/{experiment_config["experiment_folder"]}_ensemble_predictions_scaled_median_hpscaled.csv", index=False)
+
+    # Scale mean
+    X_scaled = scale(X, strategy="mean")
+    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2)
+    X_transformed = delta_lag_transformer.fit_transform(X_scaled)
+    X_transformed.set_index("numero_de_cliente", inplace=True)
+    X_transformed.loc[:, "label"] = y
+    X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])]
+    X_eval = X_eval.drop(columns=["label"])
+
+    predictions = pd.DataFrame()
+    for n, model in enumerate(models):
+        predictions["numero_de_cliente"] = X_eval.index
+        y_pred = model.predict(X_eval)
+        predictions[f"pred_{n}"] = y_pred
+    ones = np.ones(n_sends, dtype=int)
+    zeros = np.zeros(len(predictions)-n_sends, dtype=int)
+    sends = np.concatenate([ones, zeros])
+    predictions["predicted"] = sends
+    predictions[["numero_de_cliente", "predicted"]].to_csv(f"{experiment_path}/{experiment_config["experiment_folder"]}_ensemble_predictions_scaled_mean_hpscaled.csv", index=False)
     logger.info(f"Experimento completado en {(time.time() - start_time)/60:.2f} minutos")
 

@@ -172,29 +172,33 @@ class DeltaTransformer(BaseEstimator, TransformerMixin):
 
 class PercentileTransformer(BaseEstimator, TransformerMixin):
     """
-    Calcula percentiles de variables seleccionadas y crea nuevas features basadas en estos percentiles.
+    Calcula el ranking percentil de cada cliente para cada variable, agrupado por mes.
+    Los percentiles se discretizan en saltos de 5% (0, 5, 10, 15, ..., 95, 100).
+    - El valor 0 permanece como 0
+    - Los valores positivos se transforman a percentiles discretos
+    - Los valores negativos se transforman usando el valor absoluto y luego se aplica el signo negativo
     """
     
-    def __init__(self, variables=None, percentiles=[25, 50, 75, 90, 95], exclude_cols=["foto_mes", "numero_de_cliente"]):
+    def __init__(self, variables=None, exclude_cols=["foto_mes", "numero_de_cliente"], replace_original=False):
         """
         Parameters:
         -----------
         variables : list, optional
             Lista de variables para calcular percentiles. Si None, usa todas las numéricas
-        percentiles : list, default=[25, 50, 75, 90, 95]
-            Lista de percentiles a calcular
         exclude_cols : list, optional
             Columnas a excluir. Si None, usa EXCLUDE_COLS
+        replace_original : bool, default=False
+            Si True, reemplaza las columnas originales con los percentiles.
+            Si False, crea nuevas columnas con sufijo '_percentile'
         """
         self.variables = variables
-        self.percentiles = percentiles
         self.exclude_cols = exclude_cols
-        self.percentile_values_ = {}
+        self.replace_original = replace_original
         self.selected_variables_ = None
         
     def fit(self, X, y=None):
         """
-        Calcula los percentiles para las variables seleccionadas.
+        Identifica las variables para las cuales calcular percentiles.
         
         Parameters:
         -----------
@@ -218,17 +222,15 @@ class PercentileTransformer(BaseEstimator, TransformerMixin):
         else:
             self.selected_variables_ = [col for col in self.variables if col in X.columns]
         
-        # Calcular percentiles para cada variable
-        for col in self.selected_variables_:
-            self.percentile_values_[col] = {}
-            for percentile in self.percentiles:
-                self.percentile_values_[col][percentile] = np.percentile(X[col].dropna(), percentile)
-        
         return self
     
     def transform(self, X):
         """
-        Aplica la transformación de percentiles.
+        Aplica la transformación de percentiles discretizados en saltos de 5%.
+        Para cada mes y cada variable:
+        - El 0 permanece como 0
+        - Los valores positivos se rankean entre sí y se discretizan (0, 5, 10, ..., 100)
+        - Los valores negativos se rankean usando su valor absoluto, se discretizan y se les aplica signo negativo
         
         Parameters:
         -----------
@@ -238,37 +240,63 @@ class PercentileTransformer(BaseEstimator, TransformerMixin):
         Returns:
         --------
         pd.DataFrame
-            DataFrame con las nuevas columnas de percentiles
+            Si replace_original=False: DataFrame con nuevas columnas de percentiles (sufijo '_percentile')
+            Si replace_original=True: DataFrame con las columnas originales reemplazadas por percentiles
         """
         if not isinstance(X, pd.DataFrame):
             raise ValueError("X debe ser un pandas DataFrame")
             
         X_transformed = X.copy()
         
-        # Preparar lista de nuevas columnas para concatenar
-        new_columns = []
+        # Verificar que existe la columna foto_mes
+        if 'foto_mes' not in X_transformed.columns:
+            raise ValueError("El DataFrame debe contener la columna 'foto_mes'")
         
-        # Crear features basadas en percentiles
+        # Aplicar transformación a cada variable seleccionada
         for col in self.selected_variables_:
             if col in X_transformed.columns:
-                for percentile in self.percentiles:
-                    threshold = self.percentile_values_[col][percentile]
+                # Decidir el nombre de la columna de destino
+                if self.replace_original:
+                    target_col_name = col
+                else:
+                    target_col_name = f'{col}_percentile'
+                
+                # Función para calcular percentiles con la lógica especial
+                def calculate_percentile_with_sign(group):
+                    # Inicializar con NaN
+                    result = pd.Series(np.nan, index=group.index)
                     
-                    # Crear columna binaria: 1 si está por encima del percentile, 0 si no
-                    percentile_col_name = f'{col}_above_p{percentile}'
-                    above_series = (X_transformed[col] > threshold).astype(int)
-                    above_series.name = percentile_col_name
-                    new_columns.append(above_series)
+                    # Los ceros permanecen como 0
+                    zero_mask = group == 0
+                    result[zero_mask] = 0
                     
-                    # Crear columna con la distancia al percentile
-                    distance_col_name = f'{col}_dist_p{percentile}'
-                    distance_series = X_transformed[col] - threshold
-                    distance_series.name = distance_col_name
-                    new_columns.append(distance_series)
-        
-        # Concatenar todas las nuevas columnas de una sola vez
-        if new_columns:
-            X_transformed = pd.concat([X_transformed] + new_columns, axis=1)
+                    # Valores positivos
+                    pos_mask = group > 0
+                    if pos_mask.any():
+                        pos_values = group[pos_mask]
+                        # Calcular percentil rank (0-100)
+                        pos_percentiles = pos_values.rank(pct=True, method='average') * 100
+                        # Discretizar en saltos de 5%
+                        pos_percentiles_discrete = (pos_percentiles / 5).round() * 5
+                        result[pos_mask] = pos_percentiles_discrete
+                    
+                    # Valores negativos
+                    neg_mask = group < 0
+                    if neg_mask.any():
+                        neg_values = group[neg_mask]
+                        # Calcular percentil rank del valor absoluto
+                        abs_percentiles = neg_values.abs().rank(pct=True, method='average') * 100
+                        # Discretizar en saltos de 5%
+                        abs_percentiles_discrete = (abs_percentiles / 5).round() * 5
+                        # Aplicar signo negativo
+                        result[neg_mask] = -abs_percentiles_discrete
+                    
+                    return result
+                
+                # Aplicar la transformación agrupada por foto_mes
+                X_transformed[target_col_name] = X_transformed.groupby('foto_mes')[col].transform(
+                    calculate_percentile_with_sign
+                )
         
         return X_transformed
 
