@@ -2,18 +2,14 @@
 Experimento delta-lags2: Evaluación de features con delta 2 y lag 2
 """
 from datetime import datetime
-import json
 import gc
 import logging
-from nturl2path import pathname2url
 import time
 import os
-import lightgbm as lgb
-import optuna
 import random
-from sklearn.metrics import roc_auc_score, log_loss
+
 import numpy as np
-import pandas as pd
+
 
 from dmeyf2025.experiments import experiment_init
 from dmeyf2025.etl import ETL
@@ -22,7 +18,6 @@ from dmeyf2025.processors.sampler import SamplerProcessor
 from dmeyf2025.processors.feature_processors import DeltaLagTransformer, PercentileTransformer
 from dmeyf2025.modelling.optimization import optimize_params
 from dmeyf2025.modelling.train_model import train_models, prob_to_sends
-from dmeyf2025.processors.eval_processors import scale
 from dmeyf2025.utils.data_dict import FINANCIAL_COLS
 logging.basicConfig(
     level=logging.INFO,
@@ -38,7 +33,7 @@ logger = logging.getLogger(__name__)
 def get_features(X):
     delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2)
     X_transformed = delta_lag_transformer.fit_transform(X)
-    percentile_transformer = PercentileTransformer(variables=FINANCIAL_COLS)
+    percentile_transformer = PercentileTransformer(variables=FINANCIAL_COLS, replace_original=False)
     X_transformed = percentile_transformer.fit_transform(X_transformed)
     return X_transformed
 

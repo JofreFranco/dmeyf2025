@@ -1,56 +1,77 @@
-# Configuración del experimento Experimento1
-experiment:
-  name: "delta-lags-percentile" # Indica la features probadas
-  tag: "0.1_100_01-04_G_A" # "sampling_trials_from-to_feval" tag para indicar el tipo de experimento
-  version: "0.0.5" # Version de código src
-  debug: false
-  sample_ratio: 0.1
-  n_trials: 100
-  n_init: 20 # Exploración de optuna.
-  positive_classes: ["BAJA+1", "BAJA+2"] # Clase positiva durante training
-  description: "Experimento Delta lags y percentiles, optimizando por ganancia, clase positiva durante training = (BAJA+1 y BAJA+2) Set de hiperparámetros A"
-  experiments_path: "./experiments"
-  data_path: "./data"
-  raw_data_path: "./data/competencia_01_crudo.csv"
-  result_path: "./results"
-  commit: True
-  seeds: [537919, 923347, 173629, 419351, 287887] #, 41, 42, 43, 44, 45]
-  n_sends: 11500
-hyperparameters:
-  num_leaves:
-    type: "int"
-    min: 100
-    max: 1500
-  learning_rate:
-    type: "float" 
-    min: 0.001
-    max: 0.1
-  min_data_in_leaf:
-    type: "int"
-    min: 1
-    max: 2000
-  feature_fraction:
-    type: "float"
-    min: 0.01
-    max: 1.0
-  bagging_fraction:
-    type: "float"
-    min: 1.0
-    max: 1.0
-  num_boost_round:
-    type: "int"
-    min: 10000
-    max: 10000
-  early_stopping_rounds:
-    type: "int"
-    min: 50
-    max: 50
 data:
-  train_months: [202101, 202102, 202103, 202104]
-  test_month: None
   eval_month: 202106
+  test_month: None
+  train_months:
+  - 202103
+  - 202104
+experiment:
+  commit: true
+  data_path: ./data
+  debug: false
+  description: Experimento Delta lags y percentiles, optimizando por ganancia, clase
+    positiva durante training = (BAJA+1 y BAJA+2) Set de hiperparámetros B
+  experiments_path: ./experiments
+  n_init: 30
+  n_sends: 11500
+  n_trials: 150
+  name: delta-lags-percentile
+  positive_classes:
+  - BAJA+1
+  - BAJA+2
+  raw_data_path: ./data/competencia_01_crudo.csv
+  result_path: ./results
+  sample_ratio: 0.1
+  seeds:
+  - 537919
+  - 923347
+  - 173629
+  - 419351
+  - 287887
+  - 41
+  - 42
+  - 43
+  - 44
+  - 45
+  tag: 0.1_150_03-04_G_Base
+  version: 0.0.6
+hyperparameters:
+  bagging_fraction:
+    max: 1.0
+    min: 0.5
+    type: float
+  early_stopping_rounds:
+    max: 50
+    min: 50
+    type: int
+  feature_fraction:
+    max: 1.0
+    min: 0.5
+    type: float
+  learning_rate:
+    max: 0.3
+    min: 0.01
+    type: float
+  max_depth:
+    max: 12
+    min: 3
+    type: int
+  min_data_in_leaf:
+    max: 2000
+    min: 100
+    type: int
+  min_gain_to_split:
+    max: 5
+    min: 0
+    type: int
+  num_boost_round:
+    max: 10000
+    min: 10000
+    type: int
+  num_leaves:
+    max: 1200
+    min: 10
+    type: int
 weights:
-  continue: 1
   BAJA+1: 1
   BAJA+2: 1
-
+  continue: 1
