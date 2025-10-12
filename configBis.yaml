@@ -1,12 +1,12 @@
 # Configuración del experimento Experimento1
 experiment:
   name: "delta-lags-percentile" # Indica la features probadas
-  tag: "0.1_50_01-04_G" # "sampling_trials_from-to_feval" tag para indicar el tipo de experimento
-  version: "0.0.4B" # Version de código src
+  tag: "0.1_150_01-04_G_B" # "sampling_trials_from-to_feval" tag para indicar el tipo de experimento
+  version: "0.0.5" # Version de código src
   debug: false
   sample_ratio: 0.1
-  n_trials: 50
-  n_init: 20 # Exploración de optuna.
+  n_trials: 70
+  n_init: 30 # Exploración de optuna.
   positive_classes: ["BAJA+1", "BAJA+2"] # Clase positiva durante training
   description: "Experimento Delta lags y percentiles, optimizando por ganancia, clase positiva durante training = (BAJA+1 y BAJA+2) Set de hiperparámetros B"
   experiments_path: "./experiments"

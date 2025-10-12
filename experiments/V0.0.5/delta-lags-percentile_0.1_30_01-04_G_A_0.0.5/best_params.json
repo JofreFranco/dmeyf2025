@@ -1,0 +1,23 @@
+{
+  "num_leaves": 1500,
+  "learning_rate": 0.042386532984722794,
+  "min_data_in_leaf": 1939,
+  "feature_fraction": 0.7849982231667044,
+  "bagging_fraction": 1.0,
+  "num_boost_round": 238,
+  "metric": [
+    "auc",
+    "binary_logloss"
+  ],
+  "objective": "binary",
+  "boosting_type": "gbdt",
+  "verbose": -1,
+  "device_type": "CPU",
+  "num_threads": 10,
+  "force_row_wise": true,
+  "max_bin": 31,
+  "max_cat_threshold": 32,
+  "cat_smooth": 10,
+  "seed": 537919,
+  "best_k": 2520
+}

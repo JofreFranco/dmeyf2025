@@ -46,7 +46,7 @@ def get_features(X):
 if __name__ == "__main__":
     import argparse
     #### CONFIG ####
-    force_debug = True
+    force_debug = False
     parser = argparse.ArgumentParser(description="Run experiment with specified config file.")
     parser.add_argument('--config', type=str, default='config.yaml', help='YAML config file to load')
     args = parser.parse_args()
