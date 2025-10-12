@@ -14,6 +14,7 @@ experiment:
     ganancia, clase positiva durante training = (BAJA+1 y BAJA+2)
   experiments_path: ./experiments
   n_init: 20
+  n_sends: 11500
   n_trials: 50
   name: Percentiles
   positive_classes:
