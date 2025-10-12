@@ -41,8 +41,33 @@ def revenue_from_prob(y_pred, y_true, n_envios=10000):
     ganancia = tp * GANANCIA_ACIERTO - fp * COSTO_ESTIMULO
     return ganancia
 
+def lgb_gan_eval(y_pred, dataset):
+    y_true = dataset.get_label()
+    n = len(y_true)
 
-def lgb_gan_eval(y_pred, data):
+    # Ordeno de mayor a menor predicción
+    sorted_idx = np.argsort(-y_pred)
+    y_true_sorted = y_true[sorted_idx]
+
+    # Ganancia acumulada si marco como positivo los primeros k
+    # TP = +780000, FP = -20000
+    gain_per_TP = 780000
+    loss_per_FP = -20000
+
+    tp_cum = np.cumsum(y_true_sorted)
+    fp_cum = np.cumsum(1 - y_true_sorted)
+
+    gain = tp_cum * gain_per_TP + fp_cum * loss_per_FP
+
+    # Busco el k que maximiza la ganancia
+    best_k = np.argmax(gain)
+    best_gain = gain[best_k]
+
+    # LightGBM espera que devuelvas:
+    # (nombre, valor, is_higher_better)
+    return "ganancia", best_gain, True
+
+def lgb_gan_eval2(y_pred, data):
 
     """
     Función de evaluación personalizada para LightGBM que calcula ganancia.
