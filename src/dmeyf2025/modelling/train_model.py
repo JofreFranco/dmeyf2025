@@ -1,7 +1,7 @@
 import lightgbm as lgb
 import logging
 import os
-
+import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -29,9 +29,16 @@ def train_models(X_train, y_train, X_eval, params, seeds, experiment_path=None):
     models = []
     for seed in seeds:
         params["seed"] = seed
-        logger.info("Training final model with seed: {seed}")
+        logger.info(f"Training final model with seed: {seed}")
         model = train_model(X_train, y_train, params)
         models.append(model)
     predictions = predict_ensemble_model(models, X_eval)
     return predictions, models
 
+def prob_to_sends(experiment_config,predictions, n_sends, name="ensemble_predictions"):
+    experiment_path = f"{experiment_config['experiments_path']}/{experiment_config['experiment_folder']}"
+    ones = np.ones(n_sends, dtype=int)
+    zeros = np.zeros(len(predictions)-n_sends, dtype=int)
+    sends = np.concatenate([ones, zeros])
+    predictions["predicted"] = sends
+    predictions[["numero_de_cliente", "predicted"]].to_csv(f"{experiment_path}/{experiment_config["experiment_folder"]}_{name}.csv", index=False)

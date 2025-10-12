@@ -115,6 +115,7 @@ def experiment_init(config_path, debug=False, script_file=None):
     result_path = Path(config['experiment']['result_path'])
     positive_classes = config['experiment']['positive_classes']
     seeds = config['experiment']['seeds']
+    n_sends = config['experiment']['n_sends']
     if DEBUG:
         n_trials = 2
         experiment_name = f"DEBUG_{experiment_name}"
@@ -166,6 +167,7 @@ def experiment_init(config_path, debug=False, script_file=None):
         'experiments_path': experiments_path,
         'positive_classes': positive_classes,
         'seeds': seeds,
+        'n_sends': n_sends,
     }
 
 
