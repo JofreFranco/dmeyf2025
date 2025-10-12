@@ -112,7 +112,7 @@ def lgb_gan_eval(y_pred, data):
     y_ternaria = ["CONTINUA" if label == 0 else "BAJA+2" for label in y_true]
     
     # Calcular ganancia usando las probabilidades directamente
-    ganancia = revenue_from_prob(y_pred, y_ternaria)
+    ganancia = revenue_from_prob(y_pred, y_ternaria, n_envios=4000)
 
     return 'gan', ganancia, True
 

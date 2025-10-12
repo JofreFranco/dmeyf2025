@@ -55,10 +55,10 @@ class SamplerProcessor(BaseEstimator, TransformerMixin):
 
         # Construimos un DataFrame que incluye y para facilitar muestreo conjunto
         df_sampled = X.copy()
-        df_sampled['clase_binaria'] = y
+        df_sampled['label'] = y
 
         # Separar clases
-        continua_mask = df_sampled['clase_binaria'] == 0
+        continua_mask = df_sampled['label'] == 0
         other_classes = df_sampled[~continua_mask].copy()
         continua_cases = df_sampled[continua_mask].copy()
         n_continua_keep = int(len(continua_cases) * self.sample_ratio)
@@ -78,12 +78,12 @@ class SamplerProcessor(BaseEstimator, TransformerMixin):
         df_final = pd.concat([other_classes, continua_sampled], ignore_index=True)
 
         logger.info(f"✅ Dataset final: {len(df_final)} registros")
-        logger.info(f"   - Clase positiva: {(df_final['clase_binaria'] == 1).sum()}")
-        logger.info(f"   - Clase negativa: {(df_final['clase_binaria'] == 0).sum()}")
+        logger.info(f"   - Clase positiva: {(df_final['label'] == 1).sum()}")
+        logger.info(f"   - Clase negativa: {(df_final['label'] == 0).sum()}")
 
         # Extraer X_sampled (quitando la columna de clase) e y_sampled
-        X_sampled = df_final.drop(columns=['clase_binaria'])
-        y_sampled = df_final['clase_binaria']
+        X_sampled = df_final.drop(columns=['label'])
+        y_sampled = df_final['label']
 
         return X_sampled, y_sampled
 

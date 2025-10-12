@@ -12,7 +12,7 @@ class LagTransformer(BaseEstimator, TransformerMixin):
     Si no hay información del mes anterior, se deja en nulo.
     """
     
-    def __init__(self, n_lags=1, exclude_cols=["foto_mes", "numero_de_cliente"]):
+    def __init__(self, n_lags=1, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label"]):
         """
         Parameters:
         -----------
@@ -93,7 +93,7 @@ class DeltaTransformer(BaseEstimator, TransformerMixin):
     Si no hay información del mes anterior, se deja en nulo.
     """
     
-    def __init__(self, n_deltas=1, exclude_cols=["foto_mes", "numero_de_cliente"]):
+    def __init__(self, n_deltas=1, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label"]):
         """
         Parameters:
         -----------
@@ -179,7 +179,7 @@ class PercentileTransformer(BaseEstimator, TransformerMixin):
     - Los valores negativos se transforman usando el valor absoluto y luego se aplica el signo negativo
     """
     
-    def __init__(self, variables=None, exclude_cols=["foto_mes", "numero_de_cliente"], replace_original=False):
+    def __init__(self, variables=None, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label"], replace_original=False):
         """
         Parameters:
         -----------
