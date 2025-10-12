@@ -6,7 +6,7 @@ import optuna
 import numpy as np
 
 from dmeyf2025.utils.save_study import save_trials
-from dmeyf2025.metrics.revenue import lgb_gan_eval2
+from dmeyf2025.metrics.revenue import lgb_gan_eval
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
                 nfold=n_folds,
                 stratified=True,
                 shuffle=True,
-                feval=lgb_gan_eval2,
+                feval=lgb_gan_eval,
                 seed=seed,
                 return_cvbooster=False,
                 callbacks=[lgb.early_stopping(early_stopping_rounds), lgb.log_evaluation(0)]
@@ -126,7 +126,7 @@ def optimize_params(experiment_config, X_train, y_train, seed = 42):
     )
     # Crear función objetivo
     objective = create_optuna_objective(
-        experiment_config["hyperparameter_space"], X_train, y_train, seed=seed, feval=lgb_gan_eval2,
+        experiment_config["hyperparameter_space"], X_train, y_train, seed=seed, feval=lgb_gan_eval,
         params=params,
     )
     experiment_path = f"{experiment_config['experiments_path']}/{experiment_config['experiment_folder']}"

@@ -60,7 +60,7 @@ def revenue_from_prob(y_pred, y_true, n_envios=10000):
     ganancia = tp * GANANCIA_ACIERTO - fp * COSTO_ESTIMULO
     return ganancia
 
-def lgb_gan_eval(y_pred, dataset):
+def lgb_gan_eval2(y_pred, dataset):
     y_true = dataset.get_label()
     n = len(y_true)
 
@@ -86,7 +86,7 @@ def lgb_gan_eval(y_pred, dataset):
     # (nombre, valor, is_higher_better)
     return "gan", best_gain, True
 
-def lgb_gan_eval2(y_pred, data):
+def lgb_gan_eval(y_pred, data):
 
     """
     Función de evaluación personalizada para LightGBM que calcula ganancia.

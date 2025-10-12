@@ -1,8 +1,8 @@
 # Configuración del experimento Experimento1
 experiment:
   name: "delta-lags-percentile" # Indica la features probadas
-  tag: "0.1_150_01-04_G_B" # "sampling_trials_from-to_feval" tag para indicar el tipo de experimento
-  version: "0.0.5" # Version de código src
+  tag: "0.1_150_01-04_G_Base" # "sampling_trials_from-to_feval" tag para indicar el tipo de experimento
+  version: "0.0.6" # Version de código src
   debug: false
   sample_ratio: 0.1
   n_trials: 70
