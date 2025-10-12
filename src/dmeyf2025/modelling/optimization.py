@@ -3,9 +3,10 @@ import lightgbm as lgb
 import logging
 import json
 import optuna
+import numpy as np
 
 from dmeyf2025.utils.save_study import save_trials
-from dmeyf2025.metrics.revenue import lgb_gan_eval
+from dmeyf2025.metrics.revenue import lgb_gan_eval, Feval
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
             # Extraer parámetros especiales que no van directamente a LightGBM
             early_stopping_rounds = trial_params.pop('early_stopping_rounds', 50)
             num_boost_round = trial_params.pop('num_boost_round', 1000)
-            
+            feval_obj = Feval()
             # Realizar cross-validation con timeout
             cv_results = lgb.cv(
                 trial_params,
@@ -78,20 +79,18 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
                 nfold=n_folds,
                 stratified=True,
                 shuffle=True,
-                feval=feval,
+                feval=feval_obj,
                 seed=seed,
                 return_cvbooster=False,
                 callbacks=[lgb.early_stopping(early_stopping_rounds), lgb.log_evaluation(0)]
             )
 
-            # TODO: Revisar si esto es correcto
             metric_scores = cv_results[f'valid {metric_name}-mean']
             best_score = max(metric_scores)
-            
             best_iteration = len(metric_scores)
             trial.set_user_attr('metric_scores', metric_scores)
             trial.set_user_attr('actual_num_boost_round', best_iteration)
-            
+            trial.set_user_attr('best_k', int(np.mean(feval_obj.best_ks)))
             trial.set_user_attr('AUC', cv_results['valid auc-mean'][-1])
             trial.set_user_attr('AUC-std', cv_results['valid auc-stdv'][-1])
             trial.set_user_attr('Gain', cv_results['valid gan-mean'][-1])
@@ -140,9 +139,9 @@ def optimize_params(experiment_config, X_train, y_train, seed = 42):
     logger.info(f"📊 Mejor ganancia: {study.best_value:.6f}")
 
     best_trial = study.best_trial
-    auc = best_trial.intermediate_values.get(0)
-    binary_loss = best_trial.intermediate_values.get(1)
+
     logger.info(f"📊 Métricas del mejor trial:")
+    logger.info(f"Best k: {study.best_trial.user_attrs.get('best_k')}")
     logger.info(f"Best AUC: {study.best_trial.user_attrs.get('AUC')}")
     logger.info(f"Best AUC-std: {study.best_trial.user_attrs.get('AUC-std')}")
     logger.info(f"Best Gain: {study.best_trial.user_attrs.get('Gain')}")
@@ -151,6 +150,7 @@ def optimize_params(experiment_config, X_train, y_train, seed = 42):
     logger.info(f"Best Logloss-std: {study.best_trial.user_attrs.get('Logloss-std')}")
     results = {
         "best_trial_number": study.best_trial.number,
+        "best_trial_best_k": study.best_trial.user_attrs.get('best_k'),
         "best_trial_value": study.best_trial.value,
         "best_trial_AUC": study.best_trial.user_attrs.get('AUC'),
         "best_trial_AUC-std": study.best_trial.user_attrs.get('AUC-std'),
@@ -172,7 +172,7 @@ def optimize_params(experiment_config, X_train, y_train, seed = 42):
     best_trial = study.best_trial
     actual_num_boost_round = best_trial.user_attrs.get('actual_num_boost_round', best_params.get('num_boost_round', 1000))
     best_params['num_boost_round'] = actual_num_boost_round
-    
+    best_params['best_k'] = best_trial.user_attrs.get('best_k')
     logger.info(f"🎯 Número real de iteraciones usadas: {actual_num_boost_round}")
 
     json_filename = f"best_params.json"

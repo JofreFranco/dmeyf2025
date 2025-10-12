@@ -1,6 +1,25 @@
 import numpy as np
 from dmeyf2025.utils.data_dict import GANANCIA_ACIERTO, COSTO_ESTIMULO
 
+class Feval:
+    def __init__(self):
+        self.best_ks = []
+
+    def __call__(self, y_pred, dataset):
+        y_true = dataset.get_label()
+        sorted_idx = np.argsort(-y_pred)
+        y_true_sorted = y_true[sorted_idx]
+        tp_cum = np.cumsum(y_true_sorted)
+        fp_cum = np.cumsum(1 - y_true_sorted)
+
+        gain = tp_cum * 780000 + fp_cum * -20000
+        best_k = np.argmax(gain)
+        best_gain = gain[best_k]
+
+        self.best_ks.append(int(best_k))
+        return "gan", best_gain, True
+
+
 def revenue_from_prob(y_pred, y_true, n_envios=10000):
     """
     Calcula la ganancia esperada enviando estímulos a los N clientes con mayor probabilidad.
@@ -65,7 +84,7 @@ def lgb_gan_eval(y_pred, dataset):
 
     # LightGBM espera que devuelvas:
     # (nombre, valor, is_higher_better)
-    return "ganancia", best_gain, True
+    return "gan", best_gain, True
 
 def lgb_gan_eval2(y_pred, data):
 

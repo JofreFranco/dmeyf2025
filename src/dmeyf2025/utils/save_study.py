@@ -12,7 +12,13 @@ def save_trials(study, working_dir):
             'value': trial.value,
             'state': trial.state.name,
             'best_iter': trial.user_attrs.get('best_iter', None),
-            'duration_minutes': trial.user_attrs.get('duration_minutes', None)
+            'duration_minutes': trial.user_attrs.get('duration_minutes', None),
+            'auc': trial.user_attrs.get('AUC', None),
+            'auc_std': trial.user_attrs.get('AUC-std', None),
+            'gain': trial.user_attrs.get('Gain', None),
+            'gain_std': trial.user_attrs.get('Gain-std', None),
+            'logloss': trial.user_attrs.get('Logloss', None),
+            'logloss_std': trial.user_attrs.get('Logloss-std', None),
         }
         # Agregar hiperparámetros
         trial_dict.update(trial.params)
