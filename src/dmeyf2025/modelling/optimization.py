@@ -33,14 +33,14 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
         Función objetivo para Optuna
     """
 
-    logger.info(f"Training dataset shape: {X_train.shape}")
+    logger.info(f"Training dataset shape: {X_train.columns}")
     # Determinar nombre de métrica desde feval
     if hasattr(feval, '__name__'):
         metric_name = feval.__name__.replace('lgb_', '').replace('_eval', '')
     else:
         metric_name = 'metric'
     
-    
+    X_train = X_train.copy()
     def objective(trial):
         trial_start_time = time.time()
         
@@ -55,8 +55,11 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
             elif suggest_type == 'categorical':
                 params[param_name] = trial.suggest_categorical(param_name, min_val)  # min_val es la lista de opciones
         
+
         # Crear dataset
+
         train_data = lgb.Dataset(X_train, label=y_train, weight=w_train)
+        
         
         try:
             # Extraer parámetros especiales que no van directamente a LightGBM
@@ -81,10 +84,17 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
 
             metric_scores = cv_results[f'valid {metric_name}-mean']
             best_score = max(metric_scores)
-
+            
             best_iteration = len(metric_scores)
+            trial.set_user_attr('metric_scores', metric_scores)
             trial.set_user_attr('actual_num_boost_round', best_iteration)
             
+            trial.set_user_attr('AUC', cv_results['valid auc-mean'][0])
+            trial.set_user_attr('AUC-std', cv_results['valid auc-stdv'][0])
+            trial.set_user_attr('Gain', cv_results['valid gan-mean'][0])
+            trial.set_user_attr('Gain-std', cv_results['valid gan-stdv'][0])
+            trial.set_user_attr('Logloss', cv_results['valid binary_logloss-mean'][0])
+            trial.set_user_attr('Logloss-std', cv_results['valid binary_logloss-stdv'][0])
             return best_score
             
         except Exception as e:

@@ -1,3 +1,0 @@
-trial_number,value,state,best_iter,duration_minutes,num_leaves,learning_rate,min_data_in_leaf,feature_fraction,bagging_fraction,num_boost_round,early_stopping_rounds
-0,1149492000.0,COMPLETE,,,996,0.0818221126171322,3948,0.8776328579432179,1.0,10000,50
-1,1149492000.0,COMPLETE,,,201,0.050615028076749974,3248,0.717717547542628,1.0,10000,50

@@ -40,7 +40,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Run experiment with specified config file.")
-    parser.add_argument('--config', type=str, default='config3.yaml', help='YAML config file to load')
+    parser.add_argument('--config', type=str, default='config4.yaml', help='YAML config file to load')
     args = parser.parse_args()
     config_file = args.config
     experiment_config = experiment_init(config_file, script_file=__file__, debug=True)
@@ -70,8 +70,10 @@ if __name__ == "__main__":
     X["label"] = y
 
     #### Features ####
+    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2)
+    X_transformed = delta_lag_transformer.fit_transform(X)
     percentile_transformer = PercentileTransformer(variables=FINANCIAL_COLS)
-    X_transformed = percentile_transformer.fit_transform(X)
+    X_transformed = percentile_transformer.fit_transform(X_transformed)
     logger.info(f"X_transformed.shape: {X_transformed.shape}")
     
     # Loggea todas las columnas, una por línea
@@ -86,10 +88,10 @@ if __name__ == "__main__":
     X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])]
     X_eval = X_eval.drop(columns=["label"])
     X_test = X_transformed[X_transformed["foto_mes"].isin([experiment_config['test_month']])]
-
-    #### OPTIMIZACIÓN DE HIPERPARÁMETROS ###########################################################
+    #### OPTIMIZACIÓN DE HIPERPARÁMETROS ####
     sampler_processor = SamplerProcessor(experiment_config['SAMPLE_RATIO'])
     X_train_sampled, y_train_sampled = sampler_processor.fit_transform(X_train, y_train)
+    logger.info(f"X_train_sampled: {X_train_sampled.columns}")
     params = {
             'metric': ['auc', 'binary_logloss'],
             'objective': 'binary',
@@ -113,34 +115,24 @@ if __name__ == "__main__":
         sampler=optuna.samplers.TPESampler(seed=seeds[0], n_startup_trials=experiment_config["n_init"])
     )
     # Crear función objetivo
-    print(X_train_sampled["numero_de_cliente"] )
     objective = create_optuna_objective(
         experiment_config["hyperparameter_space"], X_train_sampled, y_train_sampled, seed=seeds[0], feval=lgb_gan_eval,
         params=params,
     )
-    
+
     study.optimize(objective, n_trials=experiment_config["n_trials"], n_jobs=-1)
-    
+
+    # Mostrar resultados
     total_time = time.time() - start_time
 
     logger.info(f"\n✅ Optimización completada en {total_time/60:.1f} minutos")
     logger.info(f"📊 Mejor ganancia: {study.best_value:.6f}")
-
-    best_trial = study.best_trial
-    auc = best_trial.intermediate_values.get(0)
-    binary_loss = best_trial.intermediate_values.get(1)
-    logger.info(f"Métricas del mejor trial:")
-    logger.info(f"Best AUC: {study.best_trial.user_attrs.get('AUC')}")
-    logger.info(f"Best AUC-std: {study.best_trial.user_attrs.get('AUC-std')}")
-    logger.info(f"Best Gain: {study.best_trial.user_attrs.get('Gain')}")
-    logger.info(f"Best Gain-std: {study.best_trial.user_attrs.get('Gain-std')}")
-    logger.info(f"Best Logloss: {study.best_trial.user_attrs.get('Logloss')}")
-    logger.info(f"Best Logloss-std: {study.best_trial.user_attrs.get('Logloss-std')}")
     logger.info("🎯 Mejores hiperparámetros:")
     
     for param, value in study.best_params.items():
         logger.info(f"   {param}: {value}")
 
+    # Guardar best params y trials
     best_params = study.best_params
     best_params.update(params)
     best_params.pop('early_stopping_rounds')
@@ -172,7 +164,6 @@ if __name__ == "__main__":
     else:
         X_final_train = X_train_sampled
         y_final_train = y_train_sampled
-
     X_final_train.set_index("numero_de_cliente", inplace=True)
     X_eval.set_index("numero_de_cliente", inplace=True)
     logger.info(f"X_train.shape final training: {X_final_train.shape}")
@@ -180,7 +171,7 @@ if __name__ == "__main__":
     logger.info(f"Entrenando y prediciendo con {n_seeds} seeds para ensamblado...")
     
     predictions,models = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
-    logger.info(f"Modelos entrenados: {len(models)}")
+
     #OPTIMIZACIÓN DE ENVÍOS
     if False:
         logger.info("Iniciando optimización de envíos...")
@@ -208,12 +199,16 @@ if __name__ == "__main__":
     
     # Scale median
     X_scaled = scale(X, strategy="median")
+    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2)
+    X_transformed = delta_lag_transformer.fit_transform(X_scaled)
     percentile_transformer = PercentileTransformer(variables=FINANCIAL_COLS)
-    X_transformed = percentile_transformer.fit_transform(X_scaled)
+    X_transformed = percentile_transformer.fit_transform(X_transformed)
+    logger.info(f"X_transformed.shape: {X_transformed.shape}")
     X_transformed.set_index("numero_de_cliente", inplace=True)
     X_transformed.loc[:, "label"] = y
     X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])]
     X_eval = X_eval.drop(columns=["label"])
+    print(set(X_final_train.columns) - set(X_eval.columns))
     logger.info(f"X_eval.shape: {X_eval.shape}")
     logger.info(f"X_train.shape: {X_final_train.shape}")
 
@@ -228,9 +223,11 @@ if __name__ == "__main__":
     predictions["predicted"] = sends
     predictions[["numero_de_cliente", "predicted"]].to_csv(f"{experiment_path}/{experiment_config["experiment_folder"]}_ensemble_predictions_scaled_median.csv", index=False)
     # Scale mean
-    X_scaled = scale(X, strategy="mean")
+    X_scaled = scale(X, strategy="median")
+    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2)
+    X_transformed = delta_lag_transformer.fit_transform(X_scaled)
     percentile_transformer = PercentileTransformer(variables=FINANCIAL_COLS)
-    X_transformed = percentile_transformer.fit_transform(X_scaled)
+    X_transformed = percentile_transformer.fit_transform(X_transformed)
     X_transformed.set_index("numero_de_cliente", inplace=True)
     X_transformed.loc[:, "label"] = y
     X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])]
@@ -263,14 +260,15 @@ if __name__ == "__main__":
 
     # Scale median
     X_scaled = scale(X, strategy="median")
+    X_scaled = scale(X, strategy="median")
+    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2)
+    X_transformed = delta_lag_transformer.fit_transform(X_scaled)
     percentile_transformer = PercentileTransformer(variables=FINANCIAL_COLS)
-    X_transformed = percentile_transformer.fit_transform(X_scaled)
+    X_transformed = percentile_transformer.fit_transform(X_transformed)
     X_transformed.set_index("numero_de_cliente", inplace=True)
     X_transformed.loc[:, "label"] = y
     X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])]
     X_eval = X_eval.drop(columns=["label"])
-    logger.info(f"X_eval.shape: {X_eval.shape}")
-    #X_eval.set_index("numero_de_cliente", inplace=True)
 
     predictions = pd.DataFrame()
     for n, model in enumerate(models):
@@ -285,15 +283,14 @@ if __name__ == "__main__":
 
     # Scale mean
     X_scaled = scale(X, strategy="mean")
+    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2)
+    X_transformed = delta_lag_transformer.fit_transform(X_scaled)
     percentile_transformer = PercentileTransformer(variables=FINANCIAL_COLS)
-    X_transformed = percentile_transformer.fit_transform(X_scaled)
-
-    X_transformed.loc[:, "label"] = y
+    X_transformed = percentile_transformer.fit_transform(X_transformed)
     X_transformed.set_index("numero_de_cliente", inplace=True)
-
+    X_transformed.loc[:, "label"] = y
     X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])]
     X_eval = X_eval.drop(columns=["label"])
-    #X_eval.set_index("numero_de_cliente", inplace=True)
 
     predictions = pd.DataFrame()
     for n, model in enumerate(models):

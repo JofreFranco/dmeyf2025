@@ -1,10 +1,10 @@
 {
-  "num_leaves": 201,
-  "learning_rate": 0.050615028076749974,
-  "min_data_in_leaf": 3248,
-  "feature_fraction": 0.717717547542628,
+  "num_leaves": 790,
+  "learning_rate": 0.03889480369436226,
+  "min_data_in_leaf": 2668,
+  "feature_fraction": 0.9224413447042193,
   "bagging_fraction": 1.0,
-  "num_boost_round": 1,
+  "num_boost_round": 70,
   "metric": [
     "auc",
     "binary_logloss"
