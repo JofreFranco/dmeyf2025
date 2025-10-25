@@ -12,28 +12,36 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-def save_experiment_results(experiment_config, ganancia, n_sends, ganancia_hp_scaled=None, n_sends_hp_scaled=None):
+def save_experiment_results(experiment_config, ganancias_list, n_sends_list, ganancia_mean=None, ganancia_median=None, n_sends_mean=None, n_sends_median=None, ganancia_hp_scaled=None, n_sends_hp_scaled=None):
     """
     Guardar resultados del experimento en CSV de tracking global
     
     Args:
         experiment_config (dict): Configuración del experimento
-        ganancia (float): Ganancia obtenida sin escalado de hiperparámetros
-        n_sends (int): Número de envíos sin escalado de hiperparámetros
+        ganancias_list (list): Lista de ganancias de todos los modelos
+        n_sends_list (list): Lista de n_sends de todos los modelos
+        ganancia_mean (float): Media de las ganancias
+        ganancia_median (float): Mediana de las ganancias
+        n_sends_mean (float): Media de los n_sends
+        n_sends_median (float): Mediana de los n_sends
         ganancia_hp_scaled (float, optional): Ganancia con escalado de hiperparámetros
         n_sends_hp_scaled (int, optional): Número de envíos con escalado de hiperparámetros
     """
     # Solo guardar en CSV de tracking global
-    save_to_results_tracking(experiment_config, ganancia, n_sends, ganancia_hp_scaled, n_sends_hp_scaled)
+    save_to_results_tracking(experiment_config, ganancias_list, n_sends_list, ganancia_mean, ganancia_median, n_sends_mean, n_sends_median, ganancia_hp_scaled, n_sends_hp_scaled)
 
-def save_to_results_tracking(experiment_config, ganancia, n_sends, ganancia_hp_scaled=None, n_sends_hp_scaled=None):
+def save_to_results_tracking(experiment_config, ganancias_list, n_sends_list, ganancia_mean=None, ganancia_median=None, n_sends_mean=None, n_sends_median=None, ganancia_hp_scaled=None, n_sends_hp_scaled=None):
     """
     Guardar resultados en el archivo CSV de tracking global en carpeta results
     
     Args:
         experiment_config (dict): Configuración del experimento
-        ganancia (float): Ganancia obtenida sin escalado de hiperparámetros
-        n_sends (int): Número de envíos sin escalado de hiperparámetros
+        ganancias_list (list): Lista de ganancias de todos los modelos
+        n_sends_list (list): Lista de n_sends de todos los modelos
+        ganancia_mean (float): Media de las ganancias
+        ganancia_median (float): Mediana de las ganancias
+        n_sends_mean (float): Media de los n_sends
+        n_sends_median (float): Mediana de los n_sends
         ganancia_hp_scaled (float, optional): Ganancia con escalado de hiperparámetros
         n_sends_hp_scaled (int, optional): Número de envíos con escalado de hiperparámetros
     """
@@ -50,8 +58,12 @@ def save_to_results_tracking(experiment_config, ganancia, n_sends, ganancia_hp_s
         'version': experiment_config['version'],
         'experiment_name': experiment_config['experiment_name'],
         'experiment_tag': experiment_config['config']['experiment']['tag'],
-        'ganancia': ganancia,
-        'n_sends': n_sends,
+        'ganancias_list': str(ganancias_list),  # Convertir lista a string para CSV
+        'n_sends_list': str(n_sends_list),       # Convertir lista a string para CSV
+        'ganancia_mean': ganancia_mean,
+        'ganancia_median': ganancia_median,
+        'n_sends_mean': n_sends_mean,
+        'n_sends_median': n_sends_median,
         'ganancia_hp_scaled': ganancia_hp_scaled,
         'n_sends_hp_scaled': n_sends_hp_scaled
     }
@@ -70,7 +82,8 @@ def save_to_results_tracking(experiment_config, ganancia, n_sends, ganancia_hp_s
     df_combined.to_csv(tracking_file, index=False)
     
     logger.info(f"📊 Resultados agregados al tracking: {tracking_file}")
-    logger.info(f"📈 Ganancia: {ganancia:,.0f} | N_sends: {n_sends:,}")
+    logger.info(f"📈 Ganancia Mean: {ganancia_mean:,.0f} | Ganancia Median: {ganancia_median:,.0f}")
+    logger.info(f"📈 N_sends Mean: {n_sends_mean:,.0f} | N_sends Median: {n_sends_median:,.0f}")
     if ganancia_hp_scaled is not None:
         logger.info(f"📈 Ganancia HP Scaled: {ganancia_hp_scaled:,.0f} | N_sends HP Scaled: {n_sends_hp_scaled:,}")
 

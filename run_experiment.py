@@ -43,7 +43,7 @@ def get_features(X):
 ########## MAIN ##########
 if __name__ == "__main__":
     import argparse
-    
+
     #region: Configuración
     force_debug = True
     parser = argparse.ArgumentParser(
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     #endregion
     #region: Evaluation
 
-    logger.info("Iniciando Modelado final...")
+    logger.info("Iniciando Evaluación...")
 
     if not DEBUG:
         X_final_train = X_train
@@ -140,36 +140,68 @@ if __name__ == "__main__":
 
     
     logger.debug(f"X_train.shape final training: {X_final_train.shape}")
+    logger.debug(f"X_eval.shape final evaluation: {X_eval.shape}")
+
     n_seeds = len(seeds)
     logger.info(f"Entrenando y prediciendo con {n_seeds} seeds para ensamblado...")
     
-    predictions, _ = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
+    predictions, models = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
+    rev = []
+    n_sends = []
+    for model in models:
+        y_pred = model.predict(X_eval)
+        best_sends, max_rev = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
+        rev.append(max_rev)
+        n_sends.append(best_sends)
+
+        
     y_pred = predictions["pred_ensemble"]
-    n_sends, max_ganancia = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
+    best_sends, max_rev = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
+    rev.append(max_rev)
+    n_sends.append(best_sends)
+
+    logger.info(f"N_sends Median:: {np.median(n_sends)}")
+    logger.info(f"N_sends mean:: {np.mean(n_sends)}")
     logger.info(f"N_sends: {n_sends}")
-    logger.info(f"Gain: {max_ganancia}")
+
+    logger.info(f"rev Median:: {np.median(rev)}")
+    logger.info(f"rev mean:: {np.mean(rev)}")
+    logger.info(f"rev: {rev}")
+
     
     # Guardar resultados del primer modelo
-    save_experiment_results(experiment_config, max_ganancia, n_sends)
+    save_experiment_results(experiment_config, rev, n_sends, np.mean(rev), np.median(rev), np.mean(n_sends), np.median(n_sends))
     #endregion
     #region: Evaluation with HP Scaling
-    logger.info("Iniciando Modelado final con escalado de hiperparámetros...")
+    logger.info("Iniciando evaluación con escalado de hiperparámetros...")
 
     logger.info(f"min_data_in_leaf: {best_params['min_data_in_leaf']}")
     best_params["min_data_in_leaf"] = int(best_params["min_data_in_leaf"]/(len(X_train_sampled)/len(X_final_train)))
     logger.info(f"factor de escalado: {round(len(X_train_sampled)/len(X_final_train), 2)}")
     logger.info(f"min_data_in_leaf escalado: {best_params['min_data_in_leaf']}")
     
-    predictions, _ = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
+    predictions, models = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
+    rev = []
+    n_sends = []
+    for model in models:
+        y_pred = model.predict(X_eval)
+        best_sends, max_rev = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
+        rev.append(max_rev)
+        n_sends.append(best_sends)
 
+        
     y_pred = predictions["pred_ensemble"]
-    n_sends_hp_scaled, max_ganancia_hp_scaled = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
-    logger.info(f"N_sends HP Scaled: {n_sends_hp_scaled}")
-    logger.info(f"Gain HP Scaled: {max_ganancia_hp_scaled}")
-    #endregion
+    best_sends, max_rev = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
+    rev.append(max_rev)
+    n_sends.append(best_sends)
 
-    # Guardar resultados finales con ambos modelos
-    save_experiment_results(experiment_config, max_ganancia, n_sends, max_ganancia_hp_scaled, n_sends_hp_scaled)
+    logger.info(f"N_sends HP Scaled Median:: {np.median(n_sends)}")
+    logger.info(f"N_sends HP Scaled mean:: {np.mean(n_sends)}")
+    logger.info(f"N_sends HP Scaled: {n_sends}")
+
+    logger.info(f"rev HP Scaled Median:: {np.median(rev)}")
+    logger.info(f"rev HP Scaled mean:: {np.mean(rev)}")
+    logger.info(f"rev HP Scaled: {rev}")
 
     
     logger.info(f"Experimento completado en {(time.time() - start_time)/60:.2f} minutos")
