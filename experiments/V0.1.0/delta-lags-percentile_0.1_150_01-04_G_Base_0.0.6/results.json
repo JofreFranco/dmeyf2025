@@ -1,0 +1,10 @@
+{
+  "best_trial_number": 36,
+  "best_trial_value": 1009920000.0,
+  "best_trial_AUC": 0.936600065197099,
+  "best_trial_AUC-std": 0.0045133678619814505,
+  "best_trial_Gain": 1009920000.0,
+  "best_trial_Gain-std": 10339516.429698247,
+  "best_trial_Logloss": 0.17415248785267123,
+  "best_trial_Logloss-std": 0.0052171487476763605
+}
