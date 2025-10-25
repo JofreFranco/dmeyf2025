@@ -46,9 +46,9 @@ hyperparameters:
     min: 50
     max: 50
 data:
-  train_months: [202101, 202102, 202103, 202104]
+  train_months: [202101, 202102, 202103]
   test_month: None
-  eval_month: 202106
+  eval_month: 202104
 weights:
   continue: 1
   BAJA+1: 1

@@ -116,7 +116,7 @@ def lgb_gan_eval(y_pred, data):
 
     return 'gan', ganancia, True
 
-def sends_optimization(y_pred, y_true, min_sends, max_sends):
+def sends_optimization(y_pred, y_true, min_sends, max_sends, step=500):
     """
     Función que optimiza la cantidad de envíos para maximizar la ganancia.
     """
@@ -127,9 +127,9 @@ def sends_optimization(y_pred, y_true, min_sends, max_sends):
     y_ternaria = ["CONTINUA" if label == 0 else "BAJA+2" for label in y_true]
     max_ganancia = -np.inf
     # Calcular ganancia usando las probabilidades directamente
-    for n_sends in range(min_sends, max_sends):
+    for n_sends in range(min_sends, max_sends, step):
         ganancia = revenue_from_prob(y_pred, y_ternaria, n_sends)
         if ganancia > max_ganancia:
             max_ganancia = ganancia
             best_n_sends = n_sends
-    return best_n_sends
+    return best_n_sends, max_ganancia

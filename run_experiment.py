@@ -2,16 +2,11 @@
 Experimento
 """
 from datetime import datetime
-import json
 import gc
 import logging
-from nturl2path import pathname2url
 import time
 import os
-import lightgbm as lgb
-import optuna
 import random
-from sklearn.metrics import roc_auc_score, log_loss
 import numpy as np
 import pandas as pd
 
@@ -22,8 +17,8 @@ from dmeyf2025.processors.sampler import SamplerProcessor
 from dmeyf2025.processors.feature_processors import DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer
 from dmeyf2025.modelling.optimization import optimize_params
 from dmeyf2025.modelling.train_model import train_models, prob_to_sends
-from dmeyf2025.processors.eval_processors import scale
 from dmeyf2025.utils.data_dict import FINANCIAL_COLS
+from dmeyf2025.metrics.revenue import sends_optimization
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(levelname)s | %(message)s',
@@ -50,14 +45,17 @@ if __name__ == "__main__":
     import argparse
     #### CONFIG ####
     force_debug = True
-    parser = argparse.ArgumentParser(description="Run experiment with specified config file.")
-    parser.add_argument('--config', type=str, default='config.yaml', help='YAML config file to load')
+    parser = argparse.ArgumentParser(
+        description="Run experiment with specified config file."
+        )
+    parser.add_argument(
+        '--config', type=str, default='config.yaml', help='YAML config file to load'
+        )
     args = parser.parse_args()
     config_file = args.config
 
     #### INIT EXPERIMENT ####
     experiment_config = experiment_init(config_file, script_file=__file__, debug=force_debug)
-
 
     DEBUG = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
     date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -70,15 +68,16 @@ if __name__ == "__main__":
     
     #########################################################
     ###################INICIO EXPERIMENTO###################
-    logger.info(f"""\n{'=' * 70}
+    logger.info(
+        f"""\n{'=' * 70}
     📅 {date_time}
     📝 Iniciando experimento: {experiment_config['experiment_name']}
     🎯 Descripción: {experiment_config['config']['experiment']['description']}
     🔧 Experiment folder: {experiment_config['experiment_folder']}
-{'=' * 70}""")
-
+{'=' * 70}"""
+)
     start_time = time.time()
-   
+
     #### 1 - ETL ####
     """
     Lee los datos, calcula target ternario, y divide en train, test y eval.
@@ -109,11 +108,10 @@ if __name__ == "__main__":
     logger.info(f"X_train.shape: {X_train.shape}")
 
     X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])]
+    y_eval = X_eval["label"]
     X_eval = X_eval.drop(columns=["label"])
     logger.info(f"X_eval.shape: {X_eval.shape}")
 
-    X_test = X_transformed[X_transformed["foto_mes"].isin([experiment_config['test_month']])]
-    logger.info(f"X_test.shape: {X_test.shape}")
 
     #### 2 - OPTIMIZACIÓN DE HIPERPARÁMETROS ################## ###########################################################
 
@@ -125,7 +123,7 @@ if __name__ == "__main__":
     logger.info(f"X_train_sampled.shape: {X_train_sampled.shape}")
     logger.info(f"y_train_sampled.shape: {y_train_sampled.shape}")
     # TODO: Acá test de consistencia en el target
-    best_params, study = optimize_params(experiment_config, X_train_sampled, y_train_sampled, seed = seeds[0])
+    best_params, _ = optimize_params(experiment_config, X_train_sampled, y_train_sampled, seed = seeds[0])
     gc.collect()
 
     #### Final Modeling #######################################
@@ -145,10 +143,11 @@ if __name__ == "__main__":
     n_seeds = len(seeds)
     logger.info(f"Entrenando y prediciendo con {n_seeds} seeds para ensamblado...")
     
-    predictions,models = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
-    logger.info(f"Modelos entrenados: {len(models)}")
-
-    prob_to_sends(experiment_config, predictions, n_sends, name="ensemble_predictions")
+    predictions, _ = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
+    y_pred = predictions["pred_ensemble"]
+    n_sends, max_ganancia = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
+    logger.info(f"N_sends: {n_sends}")
+    logger.info(f"Gain: {max_ganancia}")
     #X["label"] = y
     
 
@@ -161,9 +160,13 @@ if __name__ == "__main__":
     logger.info(f"factor de escalado: {round(len(X_train_sampled)/len(X_final_train), 2)}")
     logger.info(f"min_data_in_leaf escalado: {best_params['min_data_in_leaf']}")
     
-    predictions,models = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
+    predictions, _ = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
 
-    prob_to_sends(experiment_config, predictions, n_sends, name="ensemble_predictions_hpscaled")
+    y_pred = predictions["pred_ensemble"]
+    n_sends, max_ganancia = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
+    logger.info(f"N_sends: {n_sends}")
+    logger.info(f"Gain: {max_ganancia}")
 
+    
     logger.info(f"Experimento completado en {(time.time() - start_time)/60:.2f} minutos")
 
