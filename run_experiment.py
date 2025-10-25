@@ -43,7 +43,8 @@ def get_features(X):
 ########## MAIN ##########
 if __name__ == "__main__":
     import argparse
-    #### CONFIG ####
+    
+    #region: Configuración
     force_debug = True
     parser = argparse.ArgumentParser(
         description="Run experiment with specified config file."
@@ -53,10 +54,10 @@ if __name__ == "__main__":
         )
     args = parser.parse_args()
     config_file = args.config
+    
 
-    #### INIT EXPERIMENT ####
     experiment_config = experiment_init(config_file, script_file=__file__, debug=force_debug)
-
+    
     DEBUG = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
     date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     seeds = experiment_config["seeds"]
@@ -65,9 +66,8 @@ if __name__ == "__main__":
 
     np.random.seed(seeds[0])
     random.seed(seeds[0])
-    
-    #########################################################
-    ###################INICIO EXPERIMENTO###################
+    #endregion
+
     logger.info(
         f"""\n{'=' * 70}
     📅 {date_time}
@@ -78,29 +78,30 @@ if __name__ == "__main__":
 )
     start_time = time.time()
 
-    #### 1 - ETL ####
+    #region: ETL
     """
     Lee los datos, calcula target ternario, y divide en train, test y eval.
     """
     etl = ETL(experiment_config['raw_data_path'], CreateTargetProcessor(), train_months = [202101, 202102, 202103, 202104, 202105, 202106],)
     X, y, _,_,_,_ = etl.execute_complete_pipeline()
     
-    
-    #### TARGET PROCESSING ####
+    #endregion
+    #region: Preprocessing
+    #region: Target Processing
+
     target_processor = BinaryTargetProcessor(experiment_config['config']['experiment']['positive_classes'])
     X, y = target_processor.fit_transform(X, y)
     X["label"] = y
+    #endregion
+    #region: Features Processing
 
-    #### FEATURES PROCESSING ####
     logger.info("Iniciando procesamiento de features...")
-    logger.info(f"X.shape: {X.shape} - Número de cliente está incluido")
+    logger.debug(f"X.shape: {X.shape} - Número de cliente está incluido")
 
     X_transformed = get_features(X)
     X_transformed.set_index("numero_de_cliente", inplace=True)
-    logger.info(f"X_transformed.shape: {X_transformed.shape} - Sin número de cliente")
+    logger.debug(f"X_transformed.shape: {X_transformed.shape} - Sin número de cliente")
     
-    #### SPLIT DATA ####
-
     logger.info("Iniciando split de datos...")
     X_train = X_transformed[X_transformed["foto_mes"].isin(experiment_config['train_months'])]
     y_train = X_train["label"]
@@ -111,9 +112,9 @@ if __name__ == "__main__":
     y_eval = X_eval["label"]
     X_eval = X_eval.drop(columns=["label"])
     logger.info(f"X_eval.shape: {X_eval.shape}")
-
-
-    #### 2 - OPTIMIZACIÓN DE HIPERPARÁMETROS ################## ###########################################################
+    #endregion
+    #endregion
+    #region: Optimization
 
     logger.info("Iniciando optimización...")
 
@@ -125,9 +126,8 @@ if __name__ == "__main__":
     # TODO: Acá test de consistencia en el target
     best_params, _ = optimize_params(experiment_config, X_train_sampled, y_train_sampled, seed = seeds[0])
     gc.collect()
-
-    #### Final Modeling #######################################
-    ###########################################################
+    #endregion
+    #region: Evaluation
 
     logger.info("Iniciando Modelado final...")
 
@@ -139,7 +139,7 @@ if __name__ == "__main__":
         y_final_train = y_train_sampled
 
     
-    logger.info(f"X_train.shape final training: {X_final_train.shape}")
+    logger.debug(f"X_train.shape final training: {X_final_train.shape}")
     n_seeds = len(seeds)
     logger.info(f"Entrenando y prediciendo con {n_seeds} seeds para ensamblado...")
     
@@ -151,9 +151,8 @@ if __name__ == "__main__":
     
     # Guardar resultados del primer modelo
     save_experiment_results(experiment_config, max_ganancia, n_sends)
-    
-    #### Final Modeling Con Escalado de Hiperparámetros ####
-    ########################################################
+    #endregion
+    #region: Evaluation with HP Scaling
     logger.info("Iniciando Modelado final con escalado de hiperparámetros...")
 
     logger.info(f"min_data_in_leaf: {best_params['min_data_in_leaf']}")
@@ -167,7 +166,8 @@ if __name__ == "__main__":
     n_sends_hp_scaled, max_ganancia_hp_scaled = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
     logger.info(f"N_sends HP Scaled: {n_sends_hp_scaled}")
     logger.info(f"Gain HP Scaled: {max_ganancia_hp_scaled}")
-    
+    #endregion
+
     # Guardar resultados finales con ambos modelos
     save_experiment_results(experiment_config, max_ganancia, n_sends, max_ganancia_hp_scaled, n_sends_hp_scaled)
 
