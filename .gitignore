@@ -406,3 +406,18 @@ data/*
 #models
 models/
 >>>>>>> dev
+
+# experiments
+experiments/
+
+# results
+results/
+
+# logs
+logs/
+
+# .env
+.env
+
+# .env.local
+.env.local
