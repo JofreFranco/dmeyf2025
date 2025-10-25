@@ -221,3 +221,5 @@ data/*
 models/
 #experiments
 experiments/
+#results
+results/

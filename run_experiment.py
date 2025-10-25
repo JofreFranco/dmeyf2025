@@ -10,13 +10,13 @@ import random
 import numpy as np
 import pandas as pd
 
-from dmeyf2025.experiments import experiment_init
+from dmeyf2025.experiments import experiment_init, save_experiment_results
 from dmeyf2025.etl import ETL
 from dmeyf2025.processors.target_processor import BinaryTargetProcessor, CreateTargetProcessor
 from dmeyf2025.processors.sampler import SamplerProcessor
 from dmeyf2025.processors.feature_processors import DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer
 from dmeyf2025.modelling.optimization import optimize_params
-from dmeyf2025.modelling.train_model import train_models, prob_to_sends
+from dmeyf2025.modelling.train_model import train_models
 from dmeyf2025.utils.data_dict import FINANCIAL_COLS
 from dmeyf2025.metrics.revenue import sends_optimization
 logging.basicConfig(
@@ -148,10 +148,11 @@ if __name__ == "__main__":
     n_sends, max_ganancia = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
     logger.info(f"N_sends: {n_sends}")
     logger.info(f"Gain: {max_ganancia}")
-    #X["label"] = y
     
-
-    #### Final Modeling Con Escalado de Hiperparámetros ####
+    # Guardar resultados del primer modelo
+    save_experiment_results(experiment_config, max_ganancia, n_sends)
+    
+    #### Final Modeling Con Escalado de Hiperparámetros ####
     ########################################################
     logger.info("Iniciando Modelado final con escalado de hiperparámetros...")
 
@@ -163,9 +164,12 @@ if __name__ == "__main__":
     predictions, _ = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
 
     y_pred = predictions["pred_ensemble"]
-    n_sends, max_ganancia = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
-    logger.info(f"N_sends: {n_sends}")
-    logger.info(f"Gain: {max_ganancia}")
+    n_sends_hp_scaled, max_ganancia_hp_scaled = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
+    logger.info(f"N_sends HP Scaled: {n_sends_hp_scaled}")
+    logger.info(f"Gain HP Scaled: {max_ganancia_hp_scaled}")
+    
+    # Guardar resultados finales con ambos modelos
+    save_experiment_results(experiment_config, max_ganancia, n_sends, max_ganancia_hp_scaled, n_sends_hp_scaled)
 
     
     logger.info(f"Experimento completado en {(time.time() - start_time)/60:.2f} minutos")

@@ -6,9 +6,73 @@ Proporciona funcionalidades para inicializar y configurar experimentos desde arc
 import os
 import yaml
 import logging
+import pandas as pd
+from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+def save_experiment_results(experiment_config, ganancia, n_sends, ganancia_hp_scaled=None, n_sends_hp_scaled=None):
+    """
+    Guardar resultados del experimento en CSV de tracking global
+    
+    Args:
+        experiment_config (dict): Configuración del experimento
+        ganancia (float): Ganancia obtenida sin escalado de hiperparámetros
+        n_sends (int): Número de envíos sin escalado de hiperparámetros
+        ganancia_hp_scaled (float, optional): Ganancia con escalado de hiperparámetros
+        n_sends_hp_scaled (int, optional): Número de envíos con escalado de hiperparámetros
+    """
+    # Solo guardar en CSV de tracking global
+    save_to_results_tracking(experiment_config, ganancia, n_sends, ganancia_hp_scaled, n_sends_hp_scaled)
+
+def save_to_results_tracking(experiment_config, ganancia, n_sends, ganancia_hp_scaled=None, n_sends_hp_scaled=None):
+    """
+    Guardar resultados en el archivo CSV de tracking global en carpeta results
+    
+    Args:
+        experiment_config (dict): Configuración del experimento
+        ganancia (float): Ganancia obtenida sin escalado de hiperparámetros
+        n_sends (int): Número de envíos sin escalado de hiperparámetros
+        ganancia_hp_scaled (float, optional): Ganancia con escalado de hiperparámetros
+        n_sends_hp_scaled (int, optional): Número de envíos con escalado de hiperparámetros
+    """
+    results_path = Path(experiment_config['result_path'])
+    results_path.mkdir(parents=True, exist_ok=True)
+    
+    tracking_file = results_path / "experiments_tracking.csv"
+    
+    # Preparar datos para el CSV
+    now = datetime.now()
+    row_data = {
+        'date': now.strftime('%Y-%m-%d'),
+        'time': now.strftime('%H:%M:%S'),
+        'version': experiment_config['version'],
+        'experiment_name': experiment_config['experiment_name'],
+        'experiment_tag': experiment_config['config']['experiment']['tag'],
+        'ganancia': ganancia,
+        'n_sends': n_sends,
+        'ganancia_hp_scaled': ganancia_hp_scaled,
+        'n_sends_hp_scaled': n_sends_hp_scaled
+    }
+    
+    # Crear DataFrame
+    df_new = pd.DataFrame([row_data])
+    
+    # Si el archivo existe, leer y concatenar
+    if tracking_file.exists():
+        df_existing = pd.read_csv(tracking_file)
+        df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+    else:
+        df_combined = df_new
+    
+    # Guardar CSV
+    df_combined.to_csv(tracking_file, index=False)
+    
+    logger.info(f"📊 Resultados agregados al tracking: {tracking_file}")
+    logger.info(f"📈 Ganancia: {ganancia:,.0f} | N_sends: {n_sends:,}")
+    if ganancia_hp_scaled is not None:
+        logger.info(f"📈 Ganancia HP Scaled: {ganancia_hp_scaled:,.0f} | N_sends HP Scaled: {n_sends_hp_scaled:,}")
 
 def commit_experiment(experiment_dir, message):
     """Hacer un commit git del experimento"""
