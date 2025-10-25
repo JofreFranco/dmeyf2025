@@ -32,6 +32,7 @@ parser.add_argument(
     )
 args = parser.parse_args()
 CONFIG = args.config
+
 def get_features(X):
     logger.info("Iniciando period stats transformer...")
     period_stats_transformer = PeriodStatsTransformer(period=2)
@@ -67,7 +68,7 @@ def main():
     📝 Iniciando experimento: {experiment_config['experiment_name']}
     🎯 Descripción: {experiment_config['config']['experiment']['description']}
     🔧 Experiment folder: {experiment_config['experiment_folder']}
-{'=' * 70}"""
+    {'=' * 70}"""
     )
     start_time = time.time()
     
@@ -75,19 +76,19 @@ def main():
     X, y = etl_pipeline(experiment_config)
     
     # Preprocessing Pipeline
-    X_train, y_train, X_eval, y_eval = preprocessing_pipeline(X, y, experiment_config, get_features)
+    X_train, y_train, w_train, X_eval, y_eval, w_eval = preprocessing_pipeline(X, y, experiment_config, get_features)
 
     # Optimization Pipeline
-    best_params, X_train_sampled, y_train_sampled = optimization_pipeline(experiment_config, X_train, y_train, seeds)
-    
+    best_params, X_train_sampled, y_train_sampled, w_train_sampled = optimization_pipeline(experiment_config, X_train, y_train, w_train, seeds)
+  
     # Evaluation Pipeline
     experiment_path = f"{experiment_config['experiments_path']}/{experiment_config['experiment_folder']}"
-    rev, n_sends = evaluation_pipeline(experiment_config, X_train, y_train, X_eval, y_eval, best_params, seeds, experiment_path, DEBUG, X_train_sampled, y_train_sampled, is_hp_scaled=False)
+    rev, n_sends = evaluation_pipeline(experiment_config, X_train, y_train, w_train, X_eval, y_eval, w_eval, best_params, seeds, experiment_path, DEBUG, X_train_sampled, y_train_sampled,w_train_sampled, is_hp_scaled=False)
     
     save_experiment_results(experiment_config, rev, n_sends, np.mean(rev), np.median(rev), np.mean(n_sends), np.median(n_sends), hp_scaled=False)
     
     # Evaluation with HP Scaling Pipeline
-    rev_hp_scaled, n_sends_hp_scaled = evaluation_pipeline(experiment_config, X_train, y_train, X_eval, y_eval, best_params, seeds, experiment_path, DEBUG, X_train_sampled, y_train_sampled,is_hp_scaled=True)
+    rev_hp_scaled, n_sends_hp_scaled = evaluation_pipeline(experiment_config, X_train, y_train, w_train, X_eval, y_eval, w_eval, best_params, seeds, experiment_path, DEBUG, X_train_sampled, y_train_sampled,w_train_sampled, is_hp_scaled=True)
     
     save_experiment_results(experiment_config, rev_hp_scaled, n_sends_hp_scaled, np.mean(rev_hp_scaled), np.median(rev_hp_scaled), np.mean(n_sends_hp_scaled), np.median(n_sends_hp_scaled), hp_scaled=True)
     

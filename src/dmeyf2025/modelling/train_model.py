@@ -6,9 +6,9 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-def train_model(X_train, y_train, params):
-
-    train_data = lgb.Dataset(X_train, label=y_train)
+def train_model(X_train, y_train, w_train, params):
+    
+    train_data = lgb.Dataset(X_train, label=y_train, weight=w_train)
     model = lgb.train(params, train_data)
 
     return model
@@ -22,14 +22,15 @@ def predict_ensemble_model(models, X_eval):
     predictions["pred_ensemble"] = predictions.drop(columns=["numero_de_cliente"]).mean(axis=1)
     return predictions
 
-def train_models(X_train, y_train, X_eval, params, seeds, experiment_path=None):
+def train_models(X_train, y_train, X_eval, params, seeds, w_train, experiment_path=None):
+
     logger.info(f"Training dataset shape: {X_train.shape}")
     logger.info(f"Evaluating dataset shape: {X_eval.shape}")
     models = []
     for seed in seeds:
         params["seed"] = seed
         logger.info(f"Training final model with seed: {seed}")
-        model = train_model(X_train, y_train, params)
+        model = train_model(X_train, y_train, w_train, params)
         models.append(model)
     predictions = predict_ensemble_model(models, X_eval)
     return predictions, models

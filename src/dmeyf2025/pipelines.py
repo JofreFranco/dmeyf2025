@@ -33,9 +33,9 @@ def preprocessing_pipeline(X, y, experiment_config, get_features):
     
     # Target Processing
     target_processor = BinaryTargetProcessor(experiment_config['config']['experiment']['positive_classes'])
-    X, y = target_processor.fit_transform(X, y)
+    X, y, y_weight = target_processor.fit_transform(X, y)
     X["label"] = y
-    
+    X["weight"] = y_weight
     # Features Processing
     logger.info("Iniciando procesamiento de features...")
     logger.debug(f"X.shape: {X.shape} - Número de cliente está incluido")
@@ -55,28 +55,33 @@ def preprocessing_pipeline(X, y, experiment_config, get_features):
     y_eval = X_eval["label"]
     X_eval = X_eval.drop(columns=["label"])
     logger.info(f"X_eval.shape: {X_eval.shape}")
-    
-    return X_train, y_train, X_eval, y_eval
+    w_eval = X_eval["weight"]
+    w_train = X_train["weight"]
+    X_train = X_train.drop(columns=["weight"])
+    X_eval = X_eval.drop(columns=["weight"])
+    return X_train, y_train, w_train, X_eval, y_eval, w_eval
 
-def optimization_pipeline(experiment_config, X_train, y_train, seeds):
+def optimization_pipeline(experiment_config, X_train, y_train, w_train, seeds):
     """
     Optimización de hiperparámetros
     """
     logger.info("Iniciando optimización...")
 
     logger.info("Iniciando muestreo de datos...")
+    X_train["weight"] = w_train
 
     sampler_processor = SamplerProcessor(experiment_config['SAMPLE_RATIO'], random_state=seeds[0])
     X_train_sampled, y_train_sampled = sampler_processor.fit_transform(X_train, y_train)
+    W_train_sampled = X_train_sampled["weight"]
+    X_train_sampled = X_train_sampled.drop(columns=["weight"])
     logger.info(f"X_train_sampled.shape: {X_train_sampled.shape}")
     logger.info(f"y_train_sampled.shape: {y_train_sampled.shape}")
-    
-    best_params, _ = optimize_params(experiment_config, X_train_sampled, y_train_sampled, seed=seeds[0])
+    best_params, _ = optimize_params(experiment_config, X_train_sampled, y_train_sampled, W_train_sampled, seed=seeds[0])
     gc.collect()
     
-    return best_params, X_train_sampled, y_train_sampled
+    return best_params, X_train_sampled, y_train_sampled, W_train_sampled
 
-def evaluation_pipeline(experiment_config, X_train, y_train, X_eval, y_eval, best_params, seeds, experiment_path, DEBUG, X_train_sampled, y_train_sampled, is_hp_scaled=False):
+def evaluation_pipeline(experiment_config, X_train, y_train, w_train, X_eval, y_eval, w_eval, best_params, seeds, experiment_path, DEBUG, X_train_sampled, y_train_sampled,w_train_sampled, is_hp_scaled=False):
     """
     Evaluación con modelos finales
     """
@@ -85,29 +90,26 @@ def evaluation_pipeline(experiment_config, X_train, y_train, X_eval, y_eval, bes
     if not DEBUG:
         X_final_train = X_train
         y_final_train = y_train
+        w_final_train = w_train
     else:
         X_final_train = X_train_sampled
         y_final_train = y_train_sampled
-
+        w_final_train = w_train_sampled
     logger.debug(f"X_train.shape final training: {X_final_train.shape}")
     logger.debug(f"X_eval.shape final evaluation: {X_eval.shape}")
 
     n_seeds = len(seeds)
     logger.info(f"Entrenando y prediciendo con {n_seeds} seeds para ensamblado...")
     
-    predictions, models = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, experiment_path)
+    predictions, models = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, w_final_train, experiment_path)
     rev = []
     n_sends = []
-    for model in models:
-        y_pred = model.predict(X_eval)
-        best_sends, max_rev = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
+    predictions = predictions.drop(columns=["numero_de_cliente"])
+    print(predictions.head())
+    for i in range(len(predictions.columns)-1):
+        best_sends, max_rev = sends_optimization(predictions[f"pred_{i}"], w_eval)
         rev.append(max_rev)
         n_sends.append(best_sends)
-
-    y_pred = predictions["pred_ensemble"]
-    best_sends, max_rev = sends_optimization(y_pred, y_eval, min_sends=8000, max_sends=13000)
-    rev.append(max_rev)
-    n_sends.append(best_sends)
 
     if is_hp_scaled:
         logger.info(f"N_sends HP Scaled Median:: {np.median(n_sends)}")

@@ -60,76 +60,18 @@ def revenue_from_prob(y_pred, y_true, n_envios=10000):
     ganancia = tp * GANANCIA_ACIERTO - fp * COSTO_ESTIMULO
     return ganancia
 
-def lgb_gan_eval2(y_pred, dataset):
-    y_true = dataset.get_label()
-    n = len(y_true)
-
-    # Ordeno de mayor a menor predicción
-    sorted_idx = np.argsort(-y_pred)
-    y_true_sorted = y_true[sorted_idx]
-
-    # Ganancia acumulada si marco como positivo los primeros k
-    # TP = +780000, FP = -20000
-    gain_per_TP = 780000
-    loss_per_FP = -20000
-
-    tp_cum = np.cumsum(y_true_sorted)
-    fp_cum = np.cumsum(1 - y_true_sorted)
-
-    gain = tp_cum * gain_per_TP + fp_cum * loss_per_FP
-
-    # Busco el k que maximiza la ganancia
-    best_k = np.argmax(gain)
-    best_gain = gain[best_k]
-
-    # LightGBM espera que devuelvas:
-    # (nombre, valor, is_higher_better)
-    return "gan", best_gain, True
-
 def lgb_gan_eval(y_pred, data):
+    weight = data.get_weight()
 
-    """
-    Función de evaluación personalizada para LightGBM que calcula ganancia.
-    Solo BAJA+2 es considerada como clase positiva.
-    
-    Parameters:
-    -----------
-    y_pred : array-like
-        Predicciones del modelo (probabilidades para clase 1)
-    data : lgb.Dataset
-        Dataset de LightGBM con las etiquetas verdaderas
-        
-    Returns:
-    --------
-    tuple
-        (eval_name, eval_result, is_higher_better)
-    """
+    ganancia = np.where(weight == 1.00002, GANANCIA_ACIERTO, 0) - np.where(weight < 1.00002, COSTO_ESTIMULO, 0)
+    ganancia = ganancia[np.argsort(y_pred)[::-1]]
+    ganancia = np.cumsum(ganancia)
 
-    y_true = data.get_label()
+    return 'gan', np.max(ganancia) , True
+def sends_optimization(y_pred, weight):
 
-    # Convertir etiquetas binarias (0/1) a formato ternario para ganancia_prob
-    # Solo BAJA+2 es considerada positiva (clase 1), BAJA+1 ahora es CONTINUA
-    y_ternaria = ["CONTINUA" if label == 0 else "BAJA+2" for label in y_true]
-    
-    # Calcular ganancia usando las probabilidades directamente
-    ganancia = revenue_from_prob(y_pred, y_ternaria, n_envios=4000)
-
-    return 'gan', ganancia, True
-
-def sends_optimization(y_pred, y_true, min_sends, max_sends, step=500):
-    """
-    Función que optimiza la cantidad de envíos para maximizar la ganancia.
-    """
-    y_pred = np.array(y_pred)
-    y_true = np.array(y_true)
-    
-    # Convertir etiquetas binarias (0/1) a formato ternario para ganancia_prob
-    y_ternaria = ["CONTINUA" if label == 0 else "BAJA+2" for label in y_true]
-    max_ganancia = -np.inf
-    # Calcular ganancia usando las probabilidades directamente
-    for n_sends in range(min_sends, max_sends, step):
-        ganancia = revenue_from_prob(y_pred, y_ternaria, n_sends)
-        if ganancia > max_ganancia:
-            max_ganancia = ganancia
-            best_n_sends = n_sends
-    return best_n_sends, max_ganancia
+    ganancia = np.where(weight == 1.00002, GANANCIA_ACIERTO, 0) - np.where(weight < 1.00002, COSTO_ESTIMULO, 0)
+    ganancia = ganancia[np.argsort(y_pred)[::-1]]
+    ganancia = np.cumsum(ganancia)
+    print(ganancia)
+    return np.argmax(ganancia), np.max(ganancia)
