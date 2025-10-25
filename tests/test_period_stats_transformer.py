@@ -95,6 +95,26 @@ def test_period_stats_transformer():
         sample_cols = ['numero_de_cliente', 'foto_mes'] + list(new_cols)[:5]
         print(transformed_df[sample_cols].head())
         
+        # Test adicional: Probar con filtro de meses específicos
+        print(f"\n--- Test adicional: Con filtro de meses específicos ---")
+        available_months = sorted(test_df['foto_mes'].unique())
+        test_months = available_months[-2:]  # Últimos 2 meses disponibles
+        
+        print(f"Meses disponibles: {available_months}")
+        print(f"Probando con meses: {test_months}")
+        
+        transformer_filtered = PeriodStatsTransformer(period=12, months=test_months)
+        filtered_df = transformer_filtered.transform(test_df)
+        
+        print(f"Dataset filtrado: {filtered_df.shape[0]} filas")
+        print(f"Meses en resultado filtrado: {sorted(filtered_df['foto_mes'].unique())}")
+        
+        # Verificar que solo contiene los meses especificados
+        actual_months = set(filtered_df['foto_mes'].unique())
+        expected_months = set(test_months)
+        assert actual_months == expected_months, f"Esperado {expected_months}, obtenido {actual_months}"
+        print("✅ Filtro de meses funciona correctamente con datos reales")
+        
         return True
         
     except Exception as e:
@@ -130,16 +150,35 @@ def test_period_stats_transformer_small():
     test_df = pd.DataFrame(data)
     print(f"Datos sintéticos creados: {test_df.shape}")
     
-    # Aplicar transformador
+    # Test 1: Sin filtro de meses (comportamiento original)
+    print("\n--- Test 1: Sin filtro de meses ---")
     transformer = PeriodStatsTransformer(period=3)
     transformed_df = transformer.transform(test_df)
     
     print(f"Datos transformados: {transformed_df.shape}")
     print(f"Columnas nuevas: {len(transformed_df.columns) - len(test_df.columns)}")
+    print(f"Meses en resultado: {sorted(transformed_df['foto_mes'].unique())}")
+    
+    # Test 2: Con filtro de meses específicos
+    print("\n--- Test 2: Con filtro de meses [202103, 202105] ---")
+    transformer_filtered = PeriodStatsTransformer(period=3, months=[202103, 202105])
+    transformed_filtered_df = transformer_filtered.transform(test_df)
+    
+    print(f"Datos transformados (filtrados): {transformed_filtered_df.shape}")
+    print(f"Meses en resultado filtrado: {sorted(transformed_filtered_df['foto_mes'].unique())}")
+    
+    # Verificar que solo contiene los meses especificados
+    expected_months = set([202103, 202105])
+    actual_months = set(transformed_filtered_df['foto_mes'].unique())
+    assert actual_months == expected_months, f"Esperado {expected_months}, obtenido {actual_months}"
+    print("✅ Filtro de meses funciona correctamente")
     
     # Mostrar resultado
-    print("\nResultado:")
+    print("\nResultado completo:")
     print(transformed_df[['numero_de_cliente', 'foto_mes', 'var1', 'var1_period3_mean', 'var1_period3_min']].head(10))
+    
+    print("\nResultado filtrado:")
+    print(transformed_filtered_df[['numero_de_cliente', 'foto_mes', 'var1', 'var1_period3_mean', 'var1_period3_min']].head(10))
     
     return True
 

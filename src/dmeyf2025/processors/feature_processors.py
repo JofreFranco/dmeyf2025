@@ -327,19 +327,14 @@ class PeriodStatsTransformer(BaseEstimator, TransformerMixin):
         numeric_cols = [col for col in X.select_dtypes(include='number').columns if col not in self.exclude_cols]
         X.sort_values(['numero_de_cliente', 'foto_mes'], inplace=True)
         
-        # Crear todas las nuevas columnas de una vez usando operaciones vectorizadas
         new_columns = []
         
-        # Calcular todas las estadísticas para todas las columnas numéricas simultáneamente
         grouped = X.groupby('numero_de_cliente')[numeric_cols]
         
-        # Shift y rolling operations vectorizadas
         shifted_data = grouped.shift(1)
         
-        # Calcular estadísticas de ventana deslizante para todas las columnas
         rolling_stats = shifted_data.rolling(window=self.period, min_periods=1)
         
-        # Crear todas las columnas nuevas
         for stat_name, stat_func in [('min', 'min'), ('max', 'max'), ('mean', 'mean'), ('median', 'median')]:
             stats_data = getattr(rolling_stats, stat_func)()
             for col in numeric_cols:
@@ -347,7 +342,6 @@ class PeriodStatsTransformer(BaseEstimator, TransformerMixin):
                 stats_data[col].name = new_col_name
                 new_columns.append(stats_data[col])
         
-        # Concatenar todas las nuevas columnas de una sola vez
         if new_columns:
             X = pd.concat([X] + new_columns, axis=1)
         
