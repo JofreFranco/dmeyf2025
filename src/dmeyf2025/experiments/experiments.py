@@ -12,25 +12,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-def save_experiment_results(experiment_config, ganancias_list, n_sends_list, ganancia_mean=None, ganancia_median=None, n_sends_mean=None, n_sends_median=None, ganancia_hp_scaled=None, n_sends_hp_scaled=None):
-    """
-    Guardar resultados del experimento en CSV de tracking global
-    
-    Args:
-        experiment_config (dict): Configuración del experimento
-        ganancias_list (list): Lista de ganancias de todos los modelos
-        n_sends_list (list): Lista de n_sends de todos los modelos
-        ganancia_mean (float): Media de las ganancias
-        ganancia_median (float): Mediana de las ganancias
-        n_sends_mean (float): Media de los n_sends
-        n_sends_median (float): Mediana de los n_sends
-        ganancia_hp_scaled (float, optional): Ganancia con escalado de hiperparámetros
-        n_sends_hp_scaled (int, optional): Número de envíos con escalado de hiperparámetros
-    """
-    # Solo guardar en CSV de tracking global
-    save_to_results_tracking(experiment_config, ganancias_list, n_sends_list, ganancia_mean, ganancia_median, n_sends_mean, n_sends_median, ganancia_hp_scaled, n_sends_hp_scaled)
 
-def save_to_results_tracking(experiment_config, ganancias_list, n_sends_list, ganancia_mean=None, ganancia_median=None, n_sends_mean=None, n_sends_median=None, ganancia_hp_scaled=None, n_sends_hp_scaled=None):
+def save_experiment_results(experiment_config, ganancias_list, n_sends_list, ganancia_mean=None, ganancia_median=None, n_sends_mean=None, n_sends_median=None, hp_scaled=False):
     """
     Guardar resultados en el archivo CSV de tracking global en carpeta results
     
@@ -49,7 +32,7 @@ def save_to_results_tracking(experiment_config, ganancias_list, n_sends_list, ga
     results_path.mkdir(parents=True, exist_ok=True)
     
     tracking_file = results_path / "experiments_tracking.csv"
-    
+    ganancias_list = [float(ganancia) for ganancia in ganancias_list]
     # Preparar datos para el CSV
     now = datetime.now()
     row_data = {
@@ -64,8 +47,7 @@ def save_to_results_tracking(experiment_config, ganancias_list, n_sends_list, ga
         'ganancia_median': ganancia_median,
         'n_sends_mean': n_sends_mean,
         'n_sends_median': n_sends_median,
-        'ganancia_hp_scaled': ganancia_hp_scaled,
-        'n_sends_hp_scaled': n_sends_hp_scaled
+        'hp_scaled': hp_scaled
     }
     
     # Crear DataFrame
@@ -81,11 +63,16 @@ def save_to_results_tracking(experiment_config, ganancias_list, n_sends_list, ga
     # Guardar CSV
     df_combined.to_csv(tracking_file, index=False)
     
+    
     logger.info(f"📊 Resultados agregados al tracking: {tracking_file}")
-    logger.info(f"📈 Ganancia Mean: {ganancia_mean:,.0f} | Ganancia Median: {ganancia_median:,.0f}")
-    logger.info(f"📈 N_sends Mean: {n_sends_mean:,.0f} | N_sends Median: {n_sends_median:,.0f}")
-    if ganancia_hp_scaled is not None:
-        logger.info(f"📈 Ganancia HP Scaled: {ganancia_hp_scaled:,.0f} | N_sends HP Scaled: {n_sends_hp_scaled:,}")
+
+    if hp_scaled:
+        logger.info(f"📈 Ganancia Mean HP scaled: {ganancia_mean:,.0f} | Ganancia Median HP scaled: {ganancia_median:,.0f}")
+        logger.info(f"📈 N_sends Mean HP scaled: {n_sends_mean:,.0f} | N_sends Median HP scaled: {n_sends_median:,.0f}")
+    else:
+        logger.info(f"📈 Ganancia Mean: {ganancia_mean:,.0f} | Ganancia Median: {ganancia_median:,.0f}")
+        logger.info(f"📈 N_sends Mean: {n_sends_mean:,.0f} | N_sends Median: {n_sends_median:,.0f}")
+    
 
 def commit_experiment(experiment_dir, message):
     """Hacer un commit git del experimento"""

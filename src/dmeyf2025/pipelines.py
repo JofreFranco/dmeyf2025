@@ -76,7 +76,7 @@ def optimization_pipeline(experiment_config, X_train, y_train, seeds):
     
     return best_params, X_train_sampled, y_train_sampled
 
-def evaluation_pipeline(experiment_config, X_train, y_train, X_eval, y_eval, best_params, seeds, experiment_path, DEBUG, X_train_sampled, y_train_sampled):
+def evaluation_pipeline(experiment_config, X_train, y_train, X_eval, y_eval, best_params, seeds, experiment_path, DEBUG, X_train_sampled, y_train_sampled, is_hp_scaled=False):
     """
     Evaluación con modelos finales
     """
@@ -109,15 +109,26 @@ def evaluation_pipeline(experiment_config, X_train, y_train, X_eval, y_eval, bes
     rev.append(max_rev)
     n_sends.append(best_sends)
 
-    logger.info(f"N_sends Median:: {np.median(n_sends)}")
-    logger.info(f"N_sends mean:: {np.mean(n_sends)}")
-    logger.info(f"N_sends: {n_sends}")
+    if is_hp_scaled:
+        logger.info(f"N_sends HP Scaled Median:: {np.median(n_sends)}")
+        logger.info(f"N_sends HP Scaled mean:: {np.mean(n_sends)}")
+        logger.info(f"N_sends HP Scaled: {n_sends}")
+    else:
+        logger.info(f"N_sends Median:: {np.median(n_sends)}")
+        logger.info(f"N_sends mean:: {np.mean(n_sends)}")
+        logger.info(f"N_sends: {n_sends}")
 
-    logger.info(f"rev Median:: {np.median(rev)}")
-    logger.info(f"rev mean:: {np.mean(rev)}")
-    logger.info(f"rev: {rev}")
-
+    if is_hp_scaled:
+        logger.info(f"rev HP Scaled Median:: {np.median(rev)}")
+        logger.info(f"rev HP Scaled mean:: {np.mean(rev)}")
+        logger.info(f"rev HP Scaled: {rev}")
+    else:
+        logger.info(f"rev Median:: {np.median(rev)}")
+        logger.info(f"rev mean:: {np.mean(rev)}")
+        logger.info(f"rev: {rev}")
+    if is_hp_scaled:
+        experiment_config['experiment_name'] = f"{experiment_config['experiment_name']} HP Scaled"
     # Guardar resultados del primer modelo
-    save_experiment_results(experiment_config, rev, n_sends, np.mean(rev), np.median(rev), np.mean(n_sends), np.median(n_sends))
+    
     
     return rev, n_sends
