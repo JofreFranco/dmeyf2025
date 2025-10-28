@@ -17,6 +17,7 @@ class ETL:
 
     def __init__(self, csv_directory: str, pipeline: Pipeline, train_months: list = None, test_month: int = None, eval_month: int = None, blacklist_features: list = []):
         """
+        TODO: Esto quedó viejo, no se usa casi nada
         Inicializa la clase ETL.
         
         Args:

@@ -37,14 +37,20 @@ CONFIG = args.config
 
 def get_features(X):
     logger.info("Iniciando period stats transformer...")
-    period_stats_transformer = PeriodStatsTransformer(period=2)
+    logger.info(f"Cantidad de features: {len(X.columns)}")
+    initial_columns = set(X.columns)
+    period_stats_transformer = PeriodStatsTransformer(periods=[2, 3])
     X_transformed = period_stats_transformer.fit_transform(X)
-    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2)
+    new_columns = set(X_transformed.columns) - initial_columns
+    logger.info(f"Cantidad de features después de period stats transformer: {len(X_transformed.columns)}")
+    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2, exclude_cols=list(new_columns) + ["foto_mes", "numero_de_cliente", "target", "label"])
     logger.info("Iniciando delta lag transformer...")
     X_transformed = delta_lag_transformer.fit_transform(X_transformed)
-    percentile_transformer = PercentileTransformer(variables=FINANCIAL_COLS)
+    logger.info(f"Cantidad de features después de delta lag transformer: {len(X_transformed.columns)}")
+    percentile_transformer = PercentileTransformer(variables=None, replace_original=True)
     logger.info("Iniciando percentile transformer...")
     X_transformed = percentile_transformer.fit_transform(X_transformed)
+    logger.info(f"Cantidad de features después de percentile transformer: {len(X_transformed.columns)}")
     return X_transformed
 
 def main():
