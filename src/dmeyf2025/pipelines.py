@@ -1,15 +1,13 @@
 import logging
 import gc
 import numpy as np
-import pandas as pd
 from dmeyf2025.etl import ETL
 from dmeyf2025.processors.target_processor import BinaryTargetProcessor, CreateTargetProcessor
 from dmeyf2025.processors.sampler import SamplerProcessor
-from dmeyf2025.processors.feature_processors import DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer
 from dmeyf2025.modelling.optimization import optimize_params
 from dmeyf2025.modelling.train_model import train_models
 from dmeyf2025.metrics.revenue import sends_optimization
-from dmeyf2025.experiments import save_experiment_results
+
 logger = logging.getLogger(__name__)
 
 def etl_pipeline(experiment_config):

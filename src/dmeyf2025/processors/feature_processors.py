@@ -299,9 +299,9 @@ class PercentileTransformer(BaseEstimator, TransformerMixin):
         return X_transformed
 
 class DeltaLagTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, n_deltas=2, n_lags=2):
-        self.lag_transformer = LagTransformer(n_lags=n_lags)
-        self.delta_transformer = DeltaTransformer(n_deltas=n_deltas)
+    def __init__(self, n_deltas=2, n_lags=2, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label"]):
+        self.lag_transformer = LagTransformer(n_lags=n_lags, exclude_cols=exclude_cols)
+        self.delta_transformer = DeltaTransformer(n_deltas=n_deltas, exclude_cols=exclude_cols)
     
     def fit(self, X, y=None):
         self.lag_transformer.fit(X)
@@ -315,8 +315,8 @@ class DeltaLagTransformer(BaseEstimator, TransformerMixin):
         return X_transformed
 
 class PeriodStatsTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, period=12, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label"]):
-        self.period = period
+    def __init__(self, periods=[12], exclude_cols=["foto_mes", "numero_de_cliente", "target", "label"]):
+        self.periods = periods
         self.exclude_cols = exclude_cols
     
     def fit(self, X, y=None):
@@ -333,14 +333,15 @@ class PeriodStatsTransformer(BaseEstimator, TransformerMixin):
         
         shifted_data = grouped.shift(1)
         
-        rolling_stats = shifted_data.rolling(window=self.period, min_periods=1)
-        
-        for stat_name, stat_func in [('min', 'min'), ('max', 'max'), ('mean', 'mean'), ('median', 'median')]:
-            stats_data = getattr(rolling_stats, stat_func)()
-            for col in numeric_cols:
-                new_col_name = f'{col}_period{self.period}_{stat_name}'
-                stats_data[col].name = new_col_name
-                new_columns.append(stats_data[col])
+        for period in self.periods:
+            rolling_stats = shifted_data.rolling(window=period, min_periods=1)
+            
+            for stat_name, stat_func in [('min', 'min'), ('max', 'max'), ('mean', 'mean'), ('median', 'median')]:
+                stats_data = getattr(rolling_stats, stat_func)()
+                for col in numeric_cols:
+                    new_col_name = f'{col}_period{period}_{stat_name}'
+                    stats_data[col].name = new_col_name
+                    new_columns.append(stats_data[col])
         
         if new_columns:
             X = pd.concat([X] + new_columns, axis=1)
