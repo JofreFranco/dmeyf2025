@@ -12,9 +12,10 @@ from dmeyf2025.experiments import experiment_init, save_experiment_results
 from dmeyf2025.processors.feature_processors import DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer
 from dmeyf2025.utils.data_dict import FINANCIAL_COLS
 from dmeyf2025.utils.wilcoxon import compare_with_best_model
+from dmeyf2025.utils.scale_params import scale_params
 from dmeyf2025.pipelines import etl_pipeline, preprocessing_pipeline, optimization_pipeline, evaluation_pipeline
 
-FORCE_DEBUG = True
+FORCE_DEBUG = False
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,7 +25,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
 
 parser = argparse.ArgumentParser(
     description="Run experiment with specified config file."
@@ -46,8 +46,6 @@ def get_features(X):
     logger.info("Iniciando percentile transformer...")
     X_transformed = percentile_transformer.fit_transform(X_transformed)
     return X_transformed
-
-
 
 def main():
     """
@@ -90,12 +88,12 @@ def main():
     save_experiment_results(experiment_config, rev, n_sends, np.mean(rev), np.median(rev), np.mean(n_sends), np.median(n_sends), hp_scaled=False)
     
     # Evaluation with HP Scaling Pipeline
+    best_params = scale_params(best_params, X_train, X_train_sampled)
     rev_hp_scaled, n_sends_hp_scaled = evaluation_pipeline(experiment_config, X_train, y_train, w_train, X_eval, y_eval, w_eval, best_params, seeds, experiment_path, DEBUG, X_train_sampled, y_train_sampled,w_train_sampled, is_hp_scaled=True)
     compare_with_best_model(rev_hp_scaled)
     save_experiment_results(experiment_config, rev_hp_scaled, n_sends_hp_scaled, np.mean(rev_hp_scaled), np.median(rev_hp_scaled), np.mean(n_sends_hp_scaled), np.median(n_sends_hp_scaled), hp_scaled=True)
     
     logger.info(f"Experimento completado en {(time.time() - start_time)/60:.2f} minutos")
-
 
 if __name__ == "__main__":
     main()
