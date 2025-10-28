@@ -15,7 +15,7 @@ from dmeyf2025.utils.wilcoxon import compare_with_best_model
 from dmeyf2025.utils.scale_params import scale_params
 from dmeyf2025.pipelines import etl_pipeline, preprocessing_pipeline, optimization_pipeline, evaluation_pipeline
 
-FORCE_DEBUG = False
+FORCE_DEBUG = True
 
 logging.basicConfig(
     level=logging.INFO,
