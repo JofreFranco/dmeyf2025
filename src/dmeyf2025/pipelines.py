@@ -105,7 +105,6 @@ def evaluation_pipeline(experiment_config, X_train, y_train, w_train, X_eval, y_
     rev = []
     n_sends = []
     predictions = predictions.drop(columns=["numero_de_cliente"])
-    print(predictions.head())
     for i in range(len(predictions.columns)-1):
         best_sends, max_rev = sends_optimization(predictions[f"pred_{i}"], w_eval)
         rev.append(max_rev)

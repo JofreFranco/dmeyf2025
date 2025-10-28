@@ -73,5 +73,4 @@ def sends_optimization(y_pred, weight):
     ganancia = np.where(weight == 1.00002, GANANCIA_ACIERTO, 0) - np.where(weight < 1.00002, COSTO_ESTIMULO, 0)
     ganancia = ganancia[np.argsort(y_pred)[::-1]]
     ganancia = np.cumsum(ganancia)
-    print(ganancia)
     return np.argmax(ganancia), np.max(ganancia)

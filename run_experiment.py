@@ -11,7 +11,9 @@ import numpy as np
 from dmeyf2025.experiments import experiment_init, save_experiment_results
 from dmeyf2025.processors.feature_processors import DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer
 from dmeyf2025.utils.data_dict import FINANCIAL_COLS
+from dmeyf2025.utils.wilcoxon import compare_with_best_model
 from dmeyf2025.pipelines import etl_pipeline, preprocessing_pipeline, optimization_pipeline, evaluation_pipeline
+
 FORCE_DEBUG = True
 
 logging.basicConfig(
@@ -84,12 +86,12 @@ def main():
     # Evaluation Pipeline
     experiment_path = f"{experiment_config['experiments_path']}/{experiment_config['experiment_folder']}"
     rev, n_sends = evaluation_pipeline(experiment_config, X_train, y_train, w_train, X_eval, y_eval, w_eval, best_params, seeds, experiment_path, DEBUG, X_train_sampled, y_train_sampled,w_train_sampled, is_hp_scaled=False)
-    
+    compare_with_best_model(rev)
     save_experiment_results(experiment_config, rev, n_sends, np.mean(rev), np.median(rev), np.mean(n_sends), np.median(n_sends), hp_scaled=False)
     
     # Evaluation with HP Scaling Pipeline
     rev_hp_scaled, n_sends_hp_scaled = evaluation_pipeline(experiment_config, X_train, y_train, w_train, X_eval, y_eval, w_eval, best_params, seeds, experiment_path, DEBUG, X_train_sampled, y_train_sampled,w_train_sampled, is_hp_scaled=True)
-    
+    compare_with_best_model(rev_hp_scaled)
     save_experiment_results(experiment_config, rev_hp_scaled, n_sends_hp_scaled, np.mean(rev_hp_scaled), np.median(rev_hp_scaled), np.mean(n_sends_hp_scaled), np.median(n_sends_hp_scaled), hp_scaled=True)
     
     logger.info(f"Experimento completado en {(time.time() - start_time)/60:.2f} minutos")

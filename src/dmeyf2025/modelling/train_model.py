@@ -7,7 +7,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 def train_model(X_train, y_train, w_train, params):
-    
+
     train_data = lgb.Dataset(X_train, label=y_train, weight=w_train)
     model = lgb.train(params, train_data)
 
@@ -27,6 +27,15 @@ def train_models(X_train, y_train, X_eval, params, seeds, w_train, experiment_pa
     logger.info(f"Training dataset shape: {X_train.shape}")
     logger.info(f"Evaluating dataset shape: {X_eval.shape}")
     models = []
+
+    if "weight" in X_train.columns:
+        logger.warning("Weight column found in X_train, removing it")
+        w_train = X_train["weight"]
+        X_train = X_train.drop(columns=["weight"])
+    if "weight" in X_eval.columns:
+        logger.warning("Weight column found in X_eval, removing it")
+        w_eval = X_eval["weight"]
+        X_eval = X_eval.drop(columns=["weight"])
     for seed in seeds:
         params["seed"] = seed
         logger.info(f"Training final model with seed: {seed}")

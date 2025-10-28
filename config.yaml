@@ -1,11 +1,11 @@
 # Configuración del experimento Experimento1
 experiment:
-  name: "test_period_stats" # Indica la features probadas
+  name: "test_all_features" # Indica la features probadas
   tag: "test" # "sampling_trials_from-to_feval" tag para indicar el tipo de experimento
   version: "0.1.0" # Version de código src
   debug: false
-  sample_ratio: 0.1
-  n_trials: 4
+  sample_ratio: 0.01
+  n_trials: 10
   n_init: 2 # Exploración de optuna.
   positive_classes: ["BAJA+1", "BAJA+2"] # Clase positiva durante training
   description: "test"
@@ -15,28 +15,21 @@ experiment:
   result_path: "./results"
   commit: True
   seeds: [537919, 923347, 173629, 419351, 287887] #, 41, 42, 43, 44, 45]
-  n_sends: 11500
+  n_sends: 5
 hyperparameters:
+  
   num_leaves:
     type: "int"
-    min: 100
-    max: 1500
+    min: 2
+    max: 10
   learning_rate:
     type: "float" 
     min: 0.001
     max: 0.1
   min_data_in_leaf:
     type: "int"
-    min: 1
-    max: 2000
-  feature_fraction:
-    type: "float"
-    min: 0.01
-    max: 1.0
-  bagging_fraction:
-    type: "float"
-    min: 1.0
-    max: 1.0
+    min: 5000
+    max: 17000
   num_boost_round:
     type: "int"
     min: 10000
