@@ -42,6 +42,7 @@ data:
   train_months: [202101, 202102, 202103]
   test_month: None
   eval_month: 202104
+  blacklist_features: ["mprestamos_personales", "cprestamos_personales"]
 weights:
   continue: 1
   BAJA+1: 1

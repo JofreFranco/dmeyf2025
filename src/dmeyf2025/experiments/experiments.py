@@ -180,6 +180,7 @@ def experiment_init(config_path, debug=False, script_file=None):
     positive_classes = config['experiment']['positive_classes']
     seeds = config['experiment']['seeds']
     n_sends = config['experiment']['n_sends']
+    blacklist_features = config['data']['blacklist_features']
     if DEBUG:
         n_trials = 2
         experiment_name = f"DEBUG_{experiment_name}"
@@ -232,6 +233,7 @@ def experiment_init(config_path, debug=False, script_file=None):
         'positive_classes': positive_classes,
         'seeds': seeds,
         'n_sends': n_sends,
+        'blacklist_features': blacklist_features,
     }
 
 

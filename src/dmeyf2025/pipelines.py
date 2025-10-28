@@ -18,7 +18,7 @@ def etl_pipeline(experiment_config):
     """
     logger.info("Iniciando ETL pipeline...")
     etl = ETL(experiment_config['raw_data_path'], CreateTargetProcessor(), 
-              train_months=[202101, 202102, 202103, 202104, 202105, 202106])
+              train_months=[202101, 202102, 202103, 202104, 202105, 202106], blacklist_features=experiment_config['blacklist_features'])
     X, y, _, _, _, _ = etl.execute_complete_pipeline()
     if experiment_config['DEBUG']:
         X = X.sample(frac=0.1, random_state=42)

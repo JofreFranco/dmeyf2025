@@ -15,7 +15,7 @@ class ETL:
     de sklearn y guardar el resultado procesado.
     """
 
-    def __init__(self, csv_directory: str, pipeline: Pipeline, train_months: list = None, test_month: int = None, eval_month: int = None):
+    def __init__(self, csv_directory: str, pipeline: Pipeline, train_months: list = None, test_month: int = None, eval_month: int = None, blacklist_features: list = []):
         """
         Inicializa la clase ETL.
         
@@ -35,6 +35,7 @@ class ETL:
         self.train_months = train_months
         self.test_month = test_month
         self.eval_month = eval_month
+        self.blacklist_features = blacklist_features
     def read_file(self) -> pd.DataFrame:
         """
         Lee el archivo CSV desde el directorio especificado.
@@ -56,8 +57,8 @@ class ETL:
             raise FileNotFoundError(f"El archivo {self.csv_directory} no existe")
         
         try:
-            self.data = pd.read_csv(self.csv_directory)
-            logger.info(f"Archivo leído exitosamente: {len(self.data)} filas, {len(self.data.columns)} columnas")
+            self.data = pd.read_csv(self.csv_directory).drop(columns=self.blacklist_features)
+            logger.info(f"Archivo leído exitosamente: {len(self.data)} filas, {len(self.data.columns)} columnas, se eliminaron {len(self.blacklist_features)} columnas")
             return self.data
 
         except Exception as e:
