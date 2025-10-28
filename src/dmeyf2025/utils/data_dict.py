@@ -33,7 +33,8 @@ EXCLUDE_COLS = [
     'clase_ternaria', 
     'clase_binaria',
     'target_binario', 
-    'clase_peso'
+    'clase_peso',
+    'weight',
 ]
 
 # Todas las columnas categóricas

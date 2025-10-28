@@ -59,23 +59,25 @@ class CreateTargetProcessor(BaseEstimator, TransformerMixin):
         df["clase_ternaria"] = df_clientes["clase_ternaria"]
         return df
 
-    def fit_transform(self, X: pd.DataFrame, y: Optional[Any] = None) -> pd.DataFrame:
+    def fit_transform(self, X: pd.DataFrame, y: Optional[Any] = None):
         return self.transform(X)
     
 class BinaryTargetProcessor(BaseEstimator, TransformerMixin):
     """
     Procesador de sklearn para crear la clase binaria de clientes.
     """
-    def __init__(self, positive_classes: list = ["BAJA+1"]):
+    def __init__(self, positive_classes: list = ["BAJA+1", "BAJA+2"], weight: dict = {"BAJA+1": 1, "BAJA+2": 1.00002, "CONTINUA": 1}):
         self.positive_classes = positive_classes
-    
-    def fit(self, X: pd.DataFrame, y: Optional[Any] = None) -> 'BinaryTargetProcessor':
+        self.weight = weight
+    def fit(self, X: pd.DataFrame, y: Optional[Any] = None):
         return self
     
-    def transform(self, X: pd.DataFrame, y) -> pd.DataFrame:
+    def transform(self, X: pd.DataFrame, y):
 
         clase_binaria = np.array([1 if item in self.positive_classes else 0 for item in y])
-        return X, clase_binaria
+        y_weight = np.array([self.weight[item] for item in y])
+
+        return X, clase_binaria, y_weight
     
     def get_positive_classes(self) -> list:
         return self.positive_classes

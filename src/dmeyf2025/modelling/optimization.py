@@ -103,7 +103,7 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
     
     return objective
 
-def optimize_params(experiment_config, X_train, y_train, seed = 42):
+def optimize_params(experiment_config, X_train, y_train, w_train, seed = 42):
     params = {
             'metric': ['auc', 'binary_logloss'],
             'objective': 'binary',
@@ -117,7 +117,6 @@ def optimize_params(experiment_config, X_train, y_train, seed = 42):
             'cat_smooth': 10,
             'seed': seed
         }
-
     start_time = time.time()
     study = optuna.create_study(
         direction='maximize',
@@ -125,8 +124,18 @@ def optimize_params(experiment_config, X_train, y_train, seed = 42):
         sampler=optuna.samplers.TPESampler(seed=seed, n_startup_trials=experiment_config["n_init"])
     )
     # Crear función objetivo
+    if len(w_train) != len(X_train):
+        raise ValueError("w_train and X_train must have the same length")
+    if len(w_train) != len(y_train):
+        raise ValueError("w_train and y_train must have the same length")
+    if len(w_train) != len(X_train):
+        raise ValueError("w_train and X_train must have the same length")
+    if len(w_train) != len(y_train):
+        raise ValueError("w_train and y_train must have the same length")
+    if len(w_train) != len(X_train):
+        raise ValueError("w_train and X_train must have the same length")
     objective = create_optuna_objective(
-        experiment_config["hyperparameter_space"], X_train, y_train, seed=seed, feval=lgb_gan_eval,
+        experiment_config["hyperparameter_space"], X_train, y_train, w_train, seed=seed, feval=lgb_gan_eval,
         params=params,
     )
     experiment_path = f"{experiment_config['experiments_path']}/{experiment_config['experiment_folder']}"
