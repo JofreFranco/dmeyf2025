@@ -172,11 +172,17 @@ def experiment_init(config_path, debug=False, script_file=None):
     n_init = config['experiment']['n_init']
     tag = config['experiment']['tag']
     version = config['experiment']['version']
-    experiments_path = Path(config['experiment']['experiments_path'])
+    
+    # Obtener storage_path como base para todos los paths
+    storage_path = Path(config['experiment'].get('storage_path', '.'))
+    
+    # Aplicar storage_path como prefijo a todos los paths relativos
+    experiments_path = storage_path / config['experiment']['experiments_path']
     experiment_folder = Path(f"{experiment_name}_{tag}_{version}")
-    data_path = Path(config['experiment']['data_path'])
-    raw_data_path = Path(config['experiment']['raw_data_path'])
-    result_path = Path(config['experiment']['result_path'])
+    data_path = storage_path / config['experiment']['data_path']
+    raw_data_path = storage_path / config['experiment']['raw_data_path']
+    result_path = storage_path / config['experiment']['result_path']
+    
     positive_classes = config['experiment']['positive_classes']
     seeds = config['experiment']['seeds']
     n_sends = config['experiment']['n_sends']

@@ -88,7 +88,7 @@ def main():
     best_params, X_train_sampled, y_train_sampled, w_train_sampled = optimization_pipeline(experiment_config, X_train, y_train, w_train, seeds)
   
     # Evaluation Pipeline
-    experiment_path = f"{experiment_config['experiments_path']}/{experiment_config['experiment_folder']}"
+    experiment_path = experiment_config['experiments_path'] / experiment_config['experiment_folder']
     rev, n_sends = evaluation_pipeline(experiment_config, X_train, y_train, w_train, X_eval, y_eval, w_eval, best_params, seeds, experiment_path, DEBUG, X_train_sampled, y_train_sampled,w_train_sampled, is_hp_scaled=False)
     compare_with_best_model(rev)
     save_experiment_results(experiment_config, rev, n_sends, np.mean(rev), np.median(rev), np.mean(n_sends), np.median(n_sends), hp_scaled=False)

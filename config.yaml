@@ -6,13 +6,14 @@ experiment:
   debug: false
   sample_ratio: 0.1
   n_trials: 70
-  n_init: 20 # Exploración de optuna.
+  n_init: 20 # Exploración de optuna.
   positive_classes: ["BAJA+1", "BAJA+2"] # Clase positiva durante training
   description: "test"
-  experiments_path: "./experiments/1.0.0/"
-  data_path: "./data"
-  raw_data_path: "./data/competencia_01_crudo.csv"
-  result_path: "./results"
+  storage_path: "." # Directorio base para todos los paths del experimento
+  experiments_path: "experiments/1.0.0/"
+  data_path: "data"
+  raw_data_path: "data/competencia_01_crudo.csv"
+  result_path: "results"
   commit: True
   seeds: [537919, 923347, 173629, 419351, 287887] #, 41, 42, 43, 44, 45]
   n_sends: 5

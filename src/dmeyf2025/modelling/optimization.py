@@ -138,7 +138,7 @@ def optimize_params(experiment_config, X_train, y_train, w_train, seed = 42):
         experiment_config["hyperparameter_space"], X_train, y_train, w_train, seed=seed, feval=lgb_gan_eval,
         params=params,
     )
-    experiment_path = f"{experiment_config['experiments_path']}/{experiment_config['experiment_folder']}"
+    experiment_path = experiment_config['experiments_path'] / experiment_config['experiment_folder']
     study.optimize(objective, n_trials=experiment_config["n_trials"])
     
     total_time = time.time() - start_time
@@ -167,11 +167,11 @@ def optimize_params(experiment_config, X_train, y_train, w_train, seed = 42):
         "best_trial_Logloss": study.best_trial.user_attrs.get('Logloss'),
         "best_trial_Logloss-std": study.best_trial.user_attrs.get('Logloss-std'),
     }
-    json_filename = f"results.json"
-    json_path = f"{experiment_path}/{json_filename}"
+    json_filename = "results.json"
+    json_path = experiment_path / json_filename
     with open(json_path, 'w') as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
-    logger.info(f"💾 Hiperparámetros guardados en: {json_filename}")
+    logger.info(f"💾 Resultados guardados en: {json_filename}")
     best_params = study.best_params
     best_params.update(params)
     best_params.pop('early_stopping_rounds')
