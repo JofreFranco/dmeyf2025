@@ -12,7 +12,7 @@ class LagTransformer(BaseEstimator, TransformerMixin):
     Si no hay información del mes anterior, se deja en nulo.
     """
     
-    def __init__(self, n_lags=1, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label"]):
+    def __init__(self, n_lags=1, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         """
         Parameters:
         -----------
@@ -92,7 +92,7 @@ class DeltaTransformer(BaseEstimator, TransformerMixin):
     Si no hay información del mes anterior, se deja en nulo.
     """
     
-    def __init__(self, n_deltas=1, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label"]):
+    def __init__(self, n_deltas=1, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         """
         Parameters:
         -----------
@@ -177,7 +177,7 @@ class PercentileTransformer(BaseEstimator, TransformerMixin):
     - Los valores negativos se transforman usando el valor absoluto y luego se aplica el signo negativo
     """
     
-    def __init__(self, variables=None, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label"], replace_original=False):
+    def __init__(self, variables=None, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"], replace_original=False):
         """
         Parameters:
         -----------
@@ -299,7 +299,7 @@ class PercentileTransformer(BaseEstimator, TransformerMixin):
         return X_transformed
 
 class DeltaLagTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, n_deltas=2, n_lags=2, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label"]):
+    def __init__(self, n_deltas=2, n_lags=2, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         self.lag_transformer = LagTransformer(n_lags=n_lags, exclude_cols=exclude_cols)
         self.delta_transformer = DeltaTransformer(n_deltas=n_deltas, exclude_cols=exclude_cols)
     
@@ -315,7 +315,7 @@ class DeltaLagTransformer(BaseEstimator, TransformerMixin):
         return X_transformed
 
 class PeriodStatsTransformer(BaseEstimator, TransformerMixin):
-    def __init__(self, periods=[12], exclude_cols=["foto_mes", "numero_de_cliente", "target", "label"]):
+    def __init__(self, periods=[12], exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         self.periods = periods
         self.exclude_cols = exclude_cols
     

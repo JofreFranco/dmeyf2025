@@ -16,6 +16,7 @@ def train_model(X_train, y_train, w_train, params):
 def predict_ensemble_model(models, X_eval):
     predictions = pd.DataFrame()
     predictions["numero_de_cliente"] = X_eval.index
+    logger.info(f"Predicting ensemble model with {len(models)} models")
     for n, model in enumerate(models):
         y_pred = model.predict(X_eval)
         predictions[f"pred_{n}"] = y_pred
@@ -37,9 +38,10 @@ def train_models(X_train, y_train, X_eval, params, seeds, w_train, experiment_pa
         w_eval = X_eval["weight"]
         X_eval = X_eval.drop(columns=["weight"])
     for seed in seeds:
-        params["seed"] = seed
+        params_copy = params.copy()
+        params_copy["seed"] = seed
         logger.info(f"Training final model with seed: {seed}")
-        model = train_model(X_train, y_train, w_train, params)
+        model = train_model(X_train, y_train, w_train, params_copy)
         models.append(model)
     predictions = predict_ensemble_model(models, X_eval)
     return predictions, models

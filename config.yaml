@@ -4,9 +4,9 @@ experiment:
   tag: "test" # "sampling_trials_from-to_feval" tag para indicar el tipo de experimento
   version: "1.0.0" # Version de código src
   debug: false
-  sample_ratio: 0.05
+  sample_ratio: 0.1
   n_trials: 15
-  n_init: 2 # Exploración de optuna.
+  n_init: 3 # Exploración de optuna.
   positive_classes: ["BAJA+1", "BAJA+2"] # Clase positiva durante training
   description: "test"
   experiments_path: "./experiments/1.0.0/"
@@ -20,16 +20,16 @@ hyperparameters:
   
   num_leaves:
     type: "int"
-    min: 2
-    max: 10
+    min: 20
+    max: 100
   learning_rate:
     type: "float" 
     min: 0.001
-    max: 0.1
+    max: 0.05
   min_data_in_leaf:
     type: "int"
-    min: 5000
-    max: 17000
+    min: 10
+    max: 15000
   num_boost_round:
     type: "int"
     min: 10000
@@ -38,13 +38,25 @@ hyperparameters:
     type: "int"
     min: 50
     max: 50
+  feature_fraction:
+    type: "float"
+    min: 0.5
+    max: 0.5
+  bagging_fraction:
+    type: "float"
+    min: 0.5
+    max: 1
+  bagging_freq:
+    type: "int"
+    min: 10
+    max: 10
 data:
   train_months: [202101, 202102, 202103]
   test_month: None
   eval_month: 202104
   blacklist_features: ["mprestamos_personales", "cprestamos_personales"]
 weights:
-  continue: 1
+  CONTINUA: 1
   BAJA+1: 1
   BAJA+2: 1.00002
 

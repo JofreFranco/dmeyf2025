@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 import logging
 import gc
 import numpy as np
@@ -67,7 +68,7 @@ def optimization_pipeline(experiment_config, X_train, y_train, w_train, seeds):
 
     logger.info("Iniciando muestreo de datos...")
     X_train["weight"] = w_train
-
+    X_train = X_train.copy() # TODO: Esto es para evitar warnings de pandas, buscar algo mejor tal vez.
     sampler_processor = SamplerProcessor(experiment_config['SAMPLE_RATIO'], random_state=seeds[0])
     X_train_sampled, y_train_sampled = sampler_processor.fit_transform(X_train, y_train)
     W_train_sampled = X_train_sampled["weight"]

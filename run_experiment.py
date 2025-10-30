@@ -15,7 +15,7 @@ from dmeyf2025.utils.wilcoxon import compare_with_best_model
 from dmeyf2025.utils.scale_params import scale_params
 from dmeyf2025.pipelines import etl_pipeline, preprocessing_pipeline, optimization_pipeline, evaluation_pipeline
 
-FORCE_DEBUG = True
+FORCE_DEBUG = False
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,7 +43,7 @@ def get_features(X):
     X_transformed = period_stats_transformer.fit_transform(X)
     new_columns = set(X_transformed.columns) - initial_columns
     logger.info(f"Cantidad de features después de period stats transformer: {len(X_transformed.columns)}")
-    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2, exclude_cols=list(new_columns) + ["foto_mes", "numero_de_cliente", "target", "label"])
+    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2, exclude_cols=list(new_columns) + ["foto_mes", "numero_de_cliente", "target", "label", "weight"])
     logger.info("Iniciando delta lag transformer...")
     X_transformed = delta_lag_transformer.fit_transform(X_transformed)
     logger.info(f"Cantidad de features después de delta lag transformer: {len(X_transformed.columns)}")
