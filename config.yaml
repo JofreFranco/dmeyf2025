@@ -1,12 +1,12 @@
 # Configuración del experimento Experimento1
 experiment:
-  name: "test_all_features" # Indica la features probadas
-  tag: "test" # "sampling_trials_from-to_feval" tag para indicar el tipo de experimento
+  name: "all_features" # Indica la features probadas
+  tag: "sr_0.1-t70" # "sampling_trials_from-to_feval" tag para indicar el tipo de experimento
   version: "1.0.0" # Version de código src
   debug: false
   sample_ratio: 0.1
-  n_trials: 15
-  n_init: 3 # Exploración de optuna.
+  n_trials: 70
+  n_init: 20 # Exploración de optuna.
   positive_classes: ["BAJA+1", "BAJA+2"] # Clase positiva durante training
   description: "test"
   experiments_path: "./experiments/1.0.0/"
@@ -51,9 +51,9 @@ hyperparameters:
     min: 10
     max: 10
 data:
-  train_months: [202101, 202102, 202103]
+  train_months: [202008, 202009, 202010, 202011, 202012, 202101, 202102, 202103, 202104]
   test_month: None
-  eval_month: 202104
+  eval_month: 202106
   blacklist_features: ["mprestamos_personales", "cprestamos_personales"]
 weights:
   CONTINUA: 1
