@@ -36,15 +36,16 @@ def parse_list_string(list_str):
         return result
 
 
-def analyze_experiments(tracking_file='results/experiments_tracking.csv', alpha=0.05):
+def analyze_experiments(tracking_file=None, alpha=0.05):
     """
     Lee el archivo de trackeo de experimentos, ordena por ganancia promedio,
     aplica test de Wilcoxon entre el primero y el resto, y loggea resultados.
     
     Parameters:
     -----------
-    tracking_file : str, default='results/experiments_tracking.csv'
-        Ruta al archivo CSV con los resultados de los experimentos
+    tracking_file : str, optional
+        Ruta al archivo CSV con los resultados de los experimentos.
+        Si no se proporciona, usa 'results/experiments_tracking.csv'
     alpha : float, default=0.05
         Nivel de significancia para el test de Wilcoxon
         
@@ -52,6 +53,8 @@ def analyze_experiments(tracking_file='results/experiments_tracking.csv', alpha=
     --------
     None
     """
+    if tracking_file is None:
+        tracking_file = 'results/experiments_tracking.csv'
     # Leer el archivo
     logger.info(f"Leyendo archivo de tracking: {tracking_file}")
     df = pd.read_csv(tracking_file)
@@ -148,7 +151,7 @@ def analyze_experiments(tracking_file='results/experiments_tracking.csv', alpha=
     logger.info("\n")
 
 
-def compare_with_best_model(ganancias, tracking_file='results/experiments_tracking.csv', alpha=0.05):
+def compare_with_best_model(ganancias, tracking_file=None, alpha=0.05):
     """
     Toma una lista de ganancias y la compara con el mejor modelo del archivo de tracking
     usando test de Wilcoxon.
@@ -157,8 +160,9 @@ def compare_with_best_model(ganancias, tracking_file='results/experiments_tracki
     -----------
     ganancias : list or array-like
         Lista de ganancias obtenidas
-    tracking_file : str, default='results/experiments_tracking.csv'
-        Ruta al archivo CSV con los resultados de los experimentos
+    tracking_file : str, optional
+        Ruta al archivo CSV con los resultados de los experimentos.
+        Si no se proporciona, usa 'results/experiments_tracking.csv'
     alpha : float, default=0.05
         Nivel de significancia para el test de Wilcoxon
         
@@ -172,6 +176,8 @@ def compare_with_best_model(ganancias, tracking_file='results/experiments_tracki
         - 'comparison_mean': float, ganancia promedio de la nueva lista
         - 'best_mean': float, ganancia promedio del mejor modelo
     """
+    if tracking_file is None:
+        tracking_file = 'results/experiments_tracking.csv'
     # Convertir a lista de Python
     ganancias = list(np.array(ganancias))
     

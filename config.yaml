@@ -6,55 +6,59 @@ experiment:
   debug: false
   sample_ratio: 0.1
   n_trials: 70
-  n_init: 20 # Exploración de optuna.
+  n_init: 25 # Exploración de optuna.
   positive_classes: ["BAJA+1", "BAJA+2"] # Clase positiva durante training
   description: "test"
   storage_path: "." # Directorio base para todos los paths del experimento
   experiments_path: "experiments/1.0.0/"
   data_path: "data"
-  raw_data_path: "data/competencia_01_crudo.csv"
+  raw_data_path: "competencia_01_crudo.csv"
+  target_path: "competencia_01_target.csv"
   result_path: "results"
   commit: True
   seeds: [537919, 923347, 173629, 419351, 287887] #, 41, 42, 43, 44, 45]
   n_sends: 5
 hyperparameters:
   
-  num_leaves:
-    type: "int"
-    min: 20
-    max: 100
+  # Hiperparámetros relativos al tamaño del dataset de entrenamiento
+  rel_min_data_in_leaf:
+    type: "float"
+    min: 0.0001  # Evitar 0 para recorrido logarítmico
+    max: 0.5
+  rel_num_leaves:
+    type: "float"
+    min: 0.0001  # Evitar 0 para recorrido logarítmico
+    max: 1
   learning_rate:
     type: "float" 
     min: 0.001
     max: 0.05
-  min_data_in_leaf:
-    type: "int"
-    min: 10
-    max: 15000
   num_boost_round:
     type: "int"
-    min: 10000
-    max: 10000
+    min: 100000
+    max: 100000
   early_stopping_rounds:
     type: "int"
     min: 50
     max: 50
   feature_fraction:
     type: "float"
-    min: 0.5
-    max: 0.5
+    min: 0.05
+    max: 1
   bagging_fraction:
     type: "float"
     min: 0.5
     max: 1
   bagging_freq:
     type: "int"
-    min: 10
+    min: 1
     max: 10
 data:
-  train_months: [202010, 202011, 202012, 202101, 202102, 202103, 202104]
-  test_month: None
-  eval_month: 202106
+  hard_filter: 0 # Mes mínimo para considerar datos (antes de este mes no se usa ni para calcular históricos, etc.)
+  train_months: [202010, 202011, 202012, 202101, 202102, 202103]
+  test_month: None # Si es None en la búsqueda de hiperparámetros se hace cross validation.
+  eval_month: 202104
+  production_month: 202106 # Mes para generar predicciones de producción
   blacklist_features: ["mprestamos_personales", "cprestamos_personales"]
 weights:
   CONTINUA: 1

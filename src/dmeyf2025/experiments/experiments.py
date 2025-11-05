@@ -28,10 +28,9 @@ def save_experiment_results(experiment_config, ganancias_list, n_sends_list, gan
         ganancia_hp_scaled (float, optional): Ganancia con escalado de hiperparámetros
         n_sends_hp_scaled (int, optional): Número de envíos con escalado de hiperparámetros
     """
-    results_path = Path(experiment_config['result_path'])
-    results_path.mkdir(parents=True, exist_ok=True)
+    tracking_file = experiment_config['tracking_file_path']
+    tracking_file.parent.mkdir(parents=True, exist_ok=True)
     
-    tracking_file = results_path / "experiments_tracking.csv"
     ganancias_list = [float(ganancia) for ganancia in ganancias_list]
     # Preparar datos para el CSV
     now = datetime.now()
@@ -139,7 +138,7 @@ def setup_logging(experiment_dir):
 
 def experiment_init(config_path, debug=False, script_file=None):
     """
-    # TODO: Esto debería ser una clase
+    # TODO: Esto debería ser una clase probablemente
     Inicializar configuración del experimento desde archivo YAML
     
     Args:
@@ -180,8 +179,12 @@ def experiment_init(config_path, debug=False, script_file=None):
     experiments_path = storage_path / config['experiment']['experiments_path']
     experiment_folder = Path(f"{experiment_name}_{tag}_{version}")
     data_path = storage_path / config['experiment']['data_path']
-    raw_data_path = storage_path / config['experiment']['raw_data_path']
     result_path = storage_path / config['experiment']['result_path']
+    
+    # Construir todos los paths de archivos completos aquí
+    raw_data_path = data_path / config['experiment']['raw_data_path']
+    target_path = data_path / config['experiment']['target_path']
+    tracking_file_path = result_path / "experiments_tracking.csv"
     
     positive_classes = config['experiment']['positive_classes']
     seeds = config['experiment']['seeds']
@@ -194,7 +197,6 @@ def experiment_init(config_path, debug=False, script_file=None):
 
     experiment_dir = experiments_path / experiment_folder
     if DEBUG:
-        print(experiment_dir)
         experiment_dir.mkdir(parents=True, exist_ok=True)
     else:
         experiment_dir.mkdir(parents=True, exist_ok=False)
@@ -231,8 +233,11 @@ def experiment_init(config_path, debug=False, script_file=None):
         'train_months': config['data']['train_months'],
         'test_month': config['data']['test_month'],
         'eval_month': config['data']['eval_month'],
+        'production_month': config['data']['production_month'],
         'weights': weights,
         'raw_data_path': raw_data_path,
+        'target_path': target_path,
+        'tracking_file_path': tracking_file_path,
         'result_path': result_path,
         'data_path': data_path,
         'experiments_path': experiments_path,
@@ -240,6 +245,7 @@ def experiment_init(config_path, debug=False, script_file=None):
         'seeds': seeds,
         'n_sends': n_sends,
         'blacklist_features': blacklist_features,
+        'hard_filter': config['data']['hard_filter'],
     }
 
 

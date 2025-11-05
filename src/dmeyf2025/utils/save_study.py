@@ -17,8 +17,8 @@ def save_trials(study, working_dir):
             'auc_std': trial.user_attrs.get('AUC-std', None),
             'gain': trial.user_attrs.get('Gain', None),
             'gain_std': trial.user_attrs.get('Gain-std', None),
-            'logloss': trial.user_attrs.get('Logloss', None),
-            'logloss_std': trial.user_attrs.get('Logloss-std', None),
+            #'logloss': trial.user_attrs.get('Logloss', None),
+            #'logloss_std': trial.user_attrs.get('Logloss-std', None),
         }
         # Agregar hiperparámetros
         trial_dict.update(trial.params)

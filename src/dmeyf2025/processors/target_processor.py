@@ -1,9 +1,9 @@
 from typing import Any, Optional
+import os
 
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
-from dmeyf2025.utils.decorators import save_data_decorator
 
 class CreateTargetProcessor(BaseEstimator, TransformerMixin):
     """
@@ -17,11 +17,14 @@ class CreateTargetProcessor(BaseEstimator, TransformerMixin):
     Requiere que el DataFrame tenga las columnas 'foto_mes' y 'numero_de_cliente'.
     """
     
-    def __init__(self):
+    def __init__(self, target_path: str):
         """
         Inicializa el procesador de crear target.
+        
+        Args:
+            target_path: Path completo donde guardar/leer el archivo con el target calculado.
         """
-        pass
+        self.target_path = target_path
     
     def fit(self, X: pd.DataFrame, y: Optional[Any] = None) -> 'CreateTargetProcessor':
         """
@@ -29,7 +32,6 @@ class CreateTargetProcessor(BaseEstimator, TransformerMixin):
         """
         return self
     
-    @save_data_decorator("data/competencia_01_target.csv")
     def transform(self, X: pd.DataFrame, y: Optional[Any] = None) -> pd.DataFrame:
         """
         Calcula la clase ternaria para cada cliente en cada mes.
@@ -40,6 +42,10 @@ class CreateTargetProcessor(BaseEstimator, TransformerMixin):
         Returns:
             DataFrame con la columna 'clase_ternaria' agregada
         """
+        # Si el archivo con targets ya existe, leerlo
+        if os.path.exists(self.target_path):
+            return pd.read_csv(self.target_path)
+        
         if "clase_ternaria" in X.columns:
             return X
         df = X.copy()
@@ -57,6 +63,10 @@ class CreateTargetProcessor(BaseEstimator, TransformerMixin):
                 df_clientes.loc[(df_clientes['numero_de_cliente'].isin(baja_2)) & (df_clientes['foto_mes'] == mes), 'clase_ternaria'] = "BAJA+2"
         
         df["clase_ternaria"] = df_clientes["clase_ternaria"]
+        
+        # Guardar el resultado en el archivo
+        df.to_csv(self.target_path, index=False)
+        
         return df
 
     def fit_transform(self, X: pd.DataFrame, y: Optional[Any] = None):

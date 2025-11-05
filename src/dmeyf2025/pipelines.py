@@ -2,23 +2,27 @@ from contextlib import ExitStack
 import logging
 import gc
 import numpy as np
+import pandas as pd
 from dmeyf2025.etl import ETL
 from dmeyf2025.processors.target_processor import BinaryTargetProcessor, CreateTargetProcessor
 from dmeyf2025.processors.sampler import SamplerProcessor
 from dmeyf2025.modelling.optimization import optimize_params
-from dmeyf2025.modelling.train_model import train_models
+from dmeyf2025.modelling.train_model import train_models, prob_to_sends
 from dmeyf2025.metrics.revenue import sends_optimization
+from dmeyf2025.utils.feature_importance import save_feature_importance_from_models
 
 logger = logging.getLogger(__name__)
 
-def etl_pipeline(experiment_config):
+def load_data(experiment_config):
     """
-    Lee los datos, calcula target ternario, y divide en train, test y eval.
+    Lee todos los datos y calcula target ternario.
     """
     logger.info("Iniciando ETL pipeline...")
-    etl = ETL(experiment_config['raw_data_path'], CreateTargetProcessor(), 
-              train_months=[202101, 202102, 202103, 202104, 202105, 202106], blacklist_features=experiment_config['blacklist_features'])
-    X, y, _, _, _, _ = etl.execute_complete_pipeline()
+    etl = ETL(experiment_config['raw_data_path'], 
+              CreateTargetProcessor(str(experiment_config['target_path'])), 
+              blacklist_features=experiment_config['blacklist_features'],
+              hard_filter=experiment_config['hard_filter'])
+    X, y = etl.execute_complete_pipeline()
     if experiment_config['DEBUG']:
         X = X.sample(frac=0.1, random_state=42)
         y = y.sample(frac=0.1, random_state=42)
@@ -39,26 +43,40 @@ def preprocessing_pipeline(X, y, experiment_config, get_features):
     logger.info("Iniciando procesamiento de features...")
     logger.debug(f"X.shape: {X.shape} - Número de cliente está incluido")
 
-    X_transformed = get_features(X)
-    X_transformed.set_index("numero_de_cliente", inplace=True)
-    logger.debug(f"X_transformed.shape: {X_transformed.shape} - Sin número de cliente")
+    X_transformed = get_features(X, experiment_config['train_months'])
+    logger.debug(f"X_transformed.shape: {X_transformed.shape} - Con número de cliente como columna")
     
     # Split Data
     logger.info("Iniciando split de datos...")
-    X_train = X_transformed[X_transformed["foto_mes"].isin(experiment_config['train_months'])]
+    X_train = X_transformed[X_transformed["foto_mes"].isin(experiment_config['train_months'])].copy()
     y_train = X_train["label"]
-    X_train = X_train.drop(columns=["label"])
+    w_train = X_train["weight"]
+    X_train = X_train.drop(columns=["label", "weight"])
     logger.info(f"X_train.shape: {X_train.shape}")
 
-    X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])]
+    X_eval = X_transformed[X_transformed["foto_mes"].isin([experiment_config['eval_month']])].copy()
+
     y_eval = X_eval["label"]
-    X_eval = X_eval.drop(columns=["label"])
-    logger.info(f"X_eval.shape: {X_eval.shape}")
     w_eval = X_eval["weight"]
-    w_train = X_train["weight"]
-    X_train = X_train.drop(columns=["weight"])
-    X_eval = X_eval.drop(columns=["weight"])
-    return X_train, y_train, w_train, X_eval, y_eval, w_eval
+    X_eval = X_eval.drop(columns=["label", "weight"])
+    logger.info(f"X_eval.shape: {X_eval.shape}")
+    
+    # Production Data (si existe)
+    production_month = experiment_config['config']['data'].get('production_month')
+    if production_month:
+        X_prod = X_transformed[X_transformed["foto_mes"] == production_month].copy()
+        if not X_prod.empty:
+            y_prod = X_prod["label"]  # Dummy label
+            w_prod = X_prod["weight"]  # Dummy weight
+            X_prod = X_prod.drop(columns=["label", "weight"])
+            logger.info(f"X_prod.shape: {X_prod.shape}")
+        else:
+            X_prod, y_prod, w_prod, prod_clientes = None, None, None, None
+            logger.warning(f"No hay datos para production_month: {production_month}")
+    else:
+        X_prod, y_prod, w_prod = None, None, None
+    
+    return X_train, y_train, w_train, X_eval, y_eval, w_eval, X_prod, y_prod, w_prod
 
 def optimization_pipeline(experiment_config, X_train, y_train, w_train, seeds):
     """
@@ -101,6 +119,11 @@ def evaluation_pipeline(experiment_config, X_train, y_train, w_train, X_eval, y_
     logger.info(f"Entrenando y prediciendo con {n_seeds} seeds para ensamblado...")
     
     predictions, models = train_models(X_final_train, y_final_train, X_eval, best_params, seeds, w_final_train, experiment_path)
+    
+
+    if not is_hp_scaled:
+        save_feature_importance_from_models(models, experiment_path, top_n=30)
+    
     rev = []
     n_sends = []
     predictions = predictions.drop(columns=["numero_de_cliente"])
@@ -132,3 +155,73 @@ def evaluation_pipeline(experiment_config, X_train, y_train, w_train, X_eval, y_
     
     
     return rev, n_sends
+
+def production_pipeline(experiment_config, X_train, y_train, w_train, X_eval, y_eval, w_eval, X_prod, best_params, seeds):
+    """
+    Pipeline de producción que genera predicciones finales para el mes de producción.
+    Usa los datos ya procesados del preprocessing_pipeline.
+    
+    Args:
+        experiment_config: Configuración del experimento
+        X_train: Datos de entrenamiento procesados
+        y_train: Target de entrenamiento
+        w_train: Weights de entrenamiento
+        X_eval: Datos de evaluación procesados
+        y_eval: Target de evaluación
+        w_eval: Weights de evaluación
+        X_prod: Datos de producción procesados
+        best_params: Mejores hiperparámetros encontrados
+        seeds: Lista de seeds para el ensemble
+    
+    Returns:
+        str: Path del archivo de predicciones guardado
+    """
+    logger.info("="*70)
+    logger.info("Iniciando Production Pipeline...")
+    logger.info("="*70)
+    
+    if X_prod is None or X_prod.empty:
+        raise ValueError("No hay datos de producción disponibles")
+    
+    production_month = experiment_config['config']['data'].get('production_month')
+    logger.info(f"Mes de producción: {production_month}")
+    
+    # Juntar datos de train y eval para entrenar el modelo final
+    logger.info("Juntando datos de train y eval para entrenamiento final...")
+    
+    X_full = pd.concat([X_train, X_eval], axis=0)
+    y_full = pd.concat([y_train, y_eval], axis=0)
+    w_full = pd.concat([w_train, w_eval], axis=0)
+    
+    logger.info(f"Datos de entrenamiento final: {X_full.shape[0]} filas")
+    logger.info(f"Datos de producción: {X_prod.shape[0]} filas")
+    logger.info(f"Features: {X_full.shape[1]}")
+    
+    # Entrenar modelos con todos los seeds
+    logger.info(f"Entrenando modelos de producción con {len(seeds)} seeds...")
+    experiment_path = experiment_config['experiment_dir']
+    predictions, models = train_models(
+        X_full, 
+        y_full, 
+        X_prod, 
+        best_params, 
+        seeds, 
+        w_full, 
+        experiment_path
+    )
+    
+    # Usar el número óptimo de envíos del experimento
+    n_sends = experiment_config.get('best_n_sends', 11000)
+    logger.info(f"Generando predicciones para {n_sends} envíos")
+    
+    # Guardar predicciones
+    output_file = prob_to_sends(experiment_config, predictions, n_sends, name="production")
+    
+    logger.info("="*70)
+    logger.info(f"✅ Predicciones de producción guardadas en: {output_file}")
+    logger.info(f"   - Total clientes: {len(predictions)}")
+    logger.info(f"   - Predicciones positivas: {n_sends}")
+    logger.info("="*70)
+    
+    return output_file
+

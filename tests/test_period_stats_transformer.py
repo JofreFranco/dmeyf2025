@@ -17,10 +17,14 @@ def test_period_stats_transformer():
     
     print("Iniciando test del PeriodStatsTransformer...")
     
-    # Cargar el dataset
+    # Cargar el dataset usando path relativo desde el directorio del proyecto
     print("Cargando dataset...")
     try:
-        df = pd.read_csv('/Users/frjofre/Documents/EyF/dmeyf2025/data/competencia_01_crudo.csv')
+        # Buscar el archivo desde el directorio del proyecto
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        data_path = os.path.join(project_root, 'data', 'competencia_01_crudo.csv')
+        df = pd.read_csv(data_path)
+        print(f"Dataset cargado desde: {data_path}")
         print(f"Dataset cargado: {df.shape[0]} filas, {df.shape[1]} columnas")
     except Exception as e:
         print(f"Error al cargar el dataset: {e}")
