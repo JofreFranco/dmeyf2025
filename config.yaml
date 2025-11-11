@@ -1,11 +1,11 @@
 # Configuración del experimento Experimento1
 experiment:
   name: "all_features" # Indica la features probadas
-  tag: "sr_0.1-t_70-mt_202010_202104-me_202106" # "sampling_trials_meses_from_to-meses_eval" tag para indicar el tipo de experimento
+  tag: "sr_0.1-t_50-mt_202010_202104-me_202106" # "sampling_trials_meses_from_to-meses_eval" tag para indicar el tipo de experimento
   version: "1.0.0" # Version de código src
   debug: false
   sample_ratio: 0.1
-  n_trials: 70
+  n_trials: 50
   n_init: 25 # Exploración de optuna.
   positive_classes: ["BAJA+1", "BAJA+2"] # Clase positiva durante training
   description: "test"
@@ -33,14 +33,14 @@ hyperparameters:
     type: "float" 
     min: 0.001
     max: 0.05
-  num_boost_round:
+  num_boost_round: # No es el valor real de iteraciones, es el valor relativo al learning rate
     type: "int"
-    min: 100000
-    max: 100000
+    min: 10 # 200
+    max: 50 # 50000
   early_stopping_rounds:
     type: "int"
-    min: 50
-    max: 50
+    min: 750
+    max: 750
   feature_fraction:
     type: "float"
     min: 0.05
@@ -60,6 +60,7 @@ data:
   eval_month: 202104
   production_month: 202106 # Mes para generar predicciones de producción
   blacklist_features: ["mprestamos_personales", "cprestamos_personales"]
+  drop_features_csv: None # Path al CSV con features a eliminar antes de entrenar
 weights:
   CONTINUA: 1
   BAJA+1: 1

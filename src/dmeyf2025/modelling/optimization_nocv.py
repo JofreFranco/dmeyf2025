@@ -10,7 +10,7 @@ from dmeyf2025.metrics.revenue import lgb_gan_eval
 
 logger = logging.getLogger(__name__)
 
-def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = None, seed=None, n_folds=5, feval=None, params=None, experiment_path=None):
+def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = None, seed=None, n_folds=5, feval=None, params=None):
     """
     Crea la función objetivo para Optuna.
     
@@ -51,8 +51,7 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
     
     def objective(trial):
         trial_start_time = time.time()
-        trial.set_user_attr('experiment_path', experiment_path)
-
+        
         trial_params = params.copy()
 
         for param_name, (suggest_type, min_val, max_val) in hyperparameter_space.items():
@@ -91,11 +90,12 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
             early_stopping_rounds = trial_params.pop('early_stopping_rounds', 750)
             num_boost_round = trial_params.pop('num_boost_round', 15)
             num_boost_round = int(num_boost_round/trial_params['learning_rate'])
+            print(early_stopping_rounds, num_boost_round)
             if num_boost_round > early_stopping_rounds:
-                if num_boost_round/3 < 10000:
-                    early_stopping_rounds = int(num_boost_round/3)
+                if num_boost_round/10 < 2000:
+                    early_stopping_rounds = int(num_boost_round/10)
                 else:
-                    early_stopping_rounds = 10000
+                    early_stopping_rounds = 2000
             # Realizar cross-validation con timeout
             cv_results = lgb.cv(
                 trial_params,
@@ -129,36 +129,6 @@ def create_optuna_objective(hyperparameter_space, X_train, y_train, w_train = No
             logger.error(f"❌ Error en trial {trial.number}: {e}")
     
     return objective
-
-def save_best_params_callback(study, trial):
-        if study.best_trial.number == trial.number:
-            # Este es el mejor trial hasta ahora
-            params = {}
-            experiment_path = trial.user_attrs.get('experiment_path')
-            best_params_so_far = study.best_params.copy()
-            best_params_so_far.update(params)
-            best_params_so_far.pop('early_stopping_rounds', None)
-            
-            # Obtener el número real de iteraciones del trial actual
-            actual_num_boost_round = trial.user_attrs.get('actual_num_boost_round', best_params_so_far.get('num_boost_round', 1000))
-            best_params_so_far['num_boost_round'] = actual_num_boost_round
-            
-            # Guardar valores relativos y absolutos calculados si existen
-            if 'rel_min_data_in_leaf' in trial.user_attrs:
-                best_params_so_far['rel_min_data_in_leaf'] = trial.user_attrs.get('rel_min_data_in_leaf')
-                best_params_so_far['min_data_in_leaf'] = trial.user_attrs.get('min_data_in_leaf_calculated')
-            
-            if 'rel_num_leaves' in trial.user_attrs:
-                best_params_so_far['rel_num_leaves'] = trial.user_attrs.get('rel_num_leaves')
-                best_params_so_far['num_leaves'] = trial.user_attrs.get('num_leaves_calculated')
-            
-            # Guardar en archivo
-            json_filename = f"temp_best_params.json"
-            json_path = f"{experiment_path}/{json_filename}"
-            
-            with open(json_path, 'w') as f:
-                json.dump(best_params_so_far, f, indent=2, ensure_ascii=False)
-            
 
 def optimize_params(experiment_config, X_train, y_train, w_train, seed = 42):
     params = {
@@ -200,17 +170,12 @@ def optimize_params(experiment_config, X_train, y_train, w_train, seed = 42):
         raise ValueError("w_train and y_train must have the same length")
     if len(w_train) != len(X_train):
         raise ValueError("w_train and X_train must have the same length")
-    experiment_path = experiment_config['experiment_dir']
-    
     objective = create_optuna_objective(
         experiment_config["hyperparameter_space"], X_train, y_train, w_train, seed=seed, feval=lgb_gan_eval,
         params=params,
-        experiment_path=experiment_path
     )
-    
-    
-    
-    study.optimize(objective, n_trials=experiment_config["n_trials"], callbacks=[save_best_params_callback])
+    experiment_path = experiment_config['experiment_dir']
+    study.optimize(objective, n_trials=experiment_config["n_trials"])
     
     total_time = time.time() - start_time
 

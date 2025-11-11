@@ -1,4 +1,5 @@
 from contextlib import ExitStack
+import os
 import logging
 import gc
 import numpy as np
@@ -28,7 +29,7 @@ def load_data(experiment_config):
         y = y.sample(frac=0.1, random_state=42)
     return X, y
 
-def preprocessing_pipeline(X, y, experiment_config, get_features):
+def preprocessing_pipeline(X, y, experiment_config, get_features, drop_features_csv=None):
     """
     Procesamiento de target y features
     """
@@ -45,6 +46,29 @@ def preprocessing_pipeline(X, y, experiment_config, get_features):
 
     X_transformed = get_features(X, experiment_config['train_months'])
     logger.debug(f"X_transformed.shape: {X_transformed.shape} - Con número de cliente como columna")
+    if experiment_config['config']['experiment']['debug']:
+        columns_output_path = experiment_config.get('columns_output_path', 'all_columns_X_transformed.txt')
+        with open(columns_output_path, 'w') as f:
+            for col in X_transformed.columns:
+                f.write(f"{col}\n")
+        logger.info(f"Nombres de columnas de X_transformed guardados en {columns_output_path}")
+    # Eliminar features del CSV (si existe)
+    if drop_features_csv:
+        if os.path.exists(drop_features_csv):
+            logger.info(f"Eliminando features especificadas en {drop_features_csv}...")
+            df_features = pd.read_csv(drop_features_csv)
+            if 'feature' in df_features.columns:
+                features_to_drop = df_features['feature'].dropna().unique().tolist()
+                features_to_drop_existing = [f for f in features_to_drop if f in X_transformed.columns]
+                if features_to_drop_existing:
+                    X_transformed = X_transformed.drop(columns=features_to_drop_existing)
+                    logger.info(f"✅ Eliminadas {len(features_to_drop_existing)} features")
+            else:
+                logger.warning(f"El CSV {drop_features_csv} no tiene columna 'feature'")
+        else:
+            logger.warning(f"El archivo {drop_features_csv} no existe")
+    
+    logger.info(f"Features finales antes de split: {X_transformed.shape[1]}")
     
     # Split Data
     logger.info("Iniciando split de datos...")

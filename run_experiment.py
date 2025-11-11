@@ -16,7 +16,7 @@ from dmeyf2025.utils.wilcoxon import compare_with_best_model
 from dmeyf2025.utils.scale_params import scale_params
 from dmeyf2025.pipelines import load_data, preprocessing_pipeline, optimization_pipeline, evaluation_pipeline, production_pipeline
 
-FORCE_DEBUG = True
+FORCE_DEBUG = False
 
 logging.basicConfig(
     level=logging.INFO,
@@ -75,6 +75,7 @@ def get_features(X, training_months):
     random_forest_features_transformer = RandomForestFeaturesTransformer(training_months= training_months)  
     X_transformed = random_forest_features_transformer.fit_transform(X_transformed)
     logger.info(f"Cantidad de features después de RandomForest Feature Transformer: {len(X_transformed.columns)}")
+    
     return X_transformed
 
 def main():
@@ -105,8 +106,13 @@ def main():
     # ETL Pipeline
     X, y = load_data(experiment_config)
     
+    # Obtener el path del CSV de features a eliminar
+    drop_features_csv = experiment_config['config']['data'].get('drop_features_csv')
+    
     # Preprocessing Pipeline
-    X_train, y_train, w_train, X_eval, y_eval, w_eval, X_prod, y_prod, w_prod = preprocessing_pipeline(X, y, experiment_config, get_features)
+    X_train, y_train, w_train, X_eval, y_eval, w_eval, X_prod, y_prod, w_prod = preprocessing_pipeline(
+        X, y, experiment_config, get_features, drop_features_csv=drop_features_csv
+    )
     
     if False:
         check_features(X_train, 0.01) # Va a imprimir todo porque el umbral es bajo
