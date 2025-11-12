@@ -556,10 +556,21 @@ class IntraMonthTransformer(BaseTransformer):
 
         X_transformed["total_consumo_tarjetas"] = X_transformed["mtarjeta_visa_consumo"] + X_transformed["mtarjeta_master_consumo"]
     
+        # Ratios adicionales
+        X_transformed["cproductos_por_antiguedad"] = X_transformed["cproductos"] / (X_transformed["cliente_antiguedad"] + np.finfo(float).eps)
+        X_transformed["comision_por_producto"] = X_transformed["mcomisiones"] / (X_transformed["cproductos"] + np.finfo(float).eps)
+        
+        # Sumas de variables relacionadas
+        X_transformed["deliquency"] = (X_transformed["Visa_delinquency"] + X_transformed["Master_delinquency"])
+        X_transformed["status"] = (X_transformed["Visa_status"] + X_transformed["Master_status"])
         
         return X_transformed
 
-class OtherFeaturesTransformer(BaseTransformer):
+class HistoricalFeaturesTransformer(BaseTransformer):
+    """
+    Transformer que genera features históricos basados en datos de meses anteriores.
+    Incluye promedios móviles, comparaciones temporales y eventos históricos.
+    """
     def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         self.exclude_cols = exclude_cols
 
@@ -570,7 +581,8 @@ class OtherFeaturesTransformer(BaseTransformer):
 
     def _transform(self, X):
         X_transformed = X.copy()
-        # Calcular el promedio de ctarjeta_visa_transacciones de los últimos 3 meses
+        
+        # Promedios móviles de transacciones con tarjetas
         X_transformed = X_transformed.sort_values(["numero_de_cliente", "foto_mes"])
         X_transformed["visa_txn_cnt_3m_avg"] = (
             X_transformed.groupby("numero_de_cliente")["ctarjeta_visa_transacciones"]
@@ -579,8 +591,7 @@ class OtherFeaturesTransformer(BaseTransformer):
             .mean()
             .reset_index(level=0, drop=True)
         )
-        # Calcular el ratio del promedio de los últimos 3 meses sobre el valor actual
-        X_transformed["visa_txn_cnt_3m_avg_ratio"] = X_transformed["ctarjeta_visa_transacciones"] / (X_transformed["visa_txn_cnt_3m_avg"]+ np.finfo(float).eps)
+        X_transformed["visa_txn_cnt_3m_avg_ratio"] = X_transformed["ctarjeta_visa_transacciones"] / (X_transformed["visa_txn_cnt_3m_avg"] + np.finfo(float).eps)
 
         X_transformed = X_transformed.sort_values(["numero_de_cliente", "foto_mes"])
         X_transformed["master_txn_cnt_3m_avg"] = (
@@ -590,10 +601,9 @@ class OtherFeaturesTransformer(BaseTransformer):
             .mean()
             .reset_index(level=0, drop=True)
         )
-        # Calcular el ratio del promedio de los últimos 3 meses sobre el valor actual
-        X_transformed["master_txn_cnt_3m_avg_ratio"] = X_transformed["ctarjeta_master_transacciones"] / (X_transformed["master_txn_cnt_3m_avg"]+ np.finfo(float).eps)
+        X_transformed["master_txn_cnt_3m_avg_ratio"] = X_transformed["ctarjeta_master_transacciones"] / (X_transformed["master_txn_cnt_3m_avg"] + np.finfo(float).eps)
 
-        # Calcular meses desde el último pago de servicio (mpagodeservicios > 0)
+        # Meses desde eventos relevantes
         X_transformed["meses_desde_ult_pago_servicio"] = (
             X_transformed
             .sort_values(["numero_de_cliente", "foto_mes"])
@@ -609,7 +619,7 @@ class OtherFeaturesTransformer(BaseTransformer):
             .reset_index(level=0, drop=True)
         )
 
-        # perdio_producto_1m: Bandera binaria (1/0) si el recuento de productos (cproductos) disminuyó vs. el mes anterior
+        # Comparación con mes anterior
         X_transformed = X_transformed.sort_values(["numero_de_cliente", "foto_mes"])
         X_transformed["cproductos_anterior"] = (
             X_transformed.groupby("numero_de_cliente")["cproductos"].shift(1)
@@ -619,10 +629,7 @@ class OtherFeaturesTransformer(BaseTransformer):
         )
         X_transformed = X_transformed.drop(columns=["cproductos_anterior"])
 
-        # cantidad de productos dividido por antiguedad (cproductos/cliente_antiguedad)
-        X_transformed["cproductos_por_antiguedad"] = X_transformed["cproductos"] / (X_transformed["cliente_antiguedad"] + np.finfo(float).eps)
-        X_transformed["comision_por_producto"] = X_transformed["mcomisiones"] / (X_transformed["cproductos"] + np.finfo(float).eps)
-        # friccion = ccajas_consultas / avg3meses(ccajas_consultas)
+        # Fricción (basado en promedio histórico)
         X_transformed["ccajas_consultas_3m_avg"] = (
             X_transformed
                 .sort_values(["numero_de_cliente", "foto_mes"])
@@ -633,10 +640,6 @@ class OtherFeaturesTransformer(BaseTransformer):
                 .reset_index(level=0, drop=True)
         )
         X_transformed["friccion"] = X_transformed["ccajas_consultas"] / (X_transformed["ccajas_consultas_3m_avg"] + 1)
-
-        X_transformed["deliquency"] = (X_transformed["Visa_delinquency"] + X_transformed["Master_delinquency"])
-
-        X_transformed["status"] = (X_transformed["Visa_status"] + X_transformed["Master_status"])
         
         return X_transformed
 

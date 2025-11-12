@@ -11,7 +11,7 @@ from flaml import AutoML
 import lightgbm as lgb
 from flaml.default import preprocess_and_suggest_hyperparams
 import logging
-from dmeyf2025.processors.feature_processors import CleanZerosTransformer, DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer, TendencyTransformer, IntraMonthTransformer, RandomForestFeaturesTransformer, DatesTransformer, OtherFeaturesTransformer
+from dmeyf2025.processors.feature_processors import CleanZerosTransformer, DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer, TendencyTransformer, IntraMonthTransformer, RandomForestFeaturesTransformer, DatesTransformer, HistoricalFeaturesTransformer
 from dmeyf2025.metrics.revenue import GANANCIA_ACIERTO, COSTO_ESTIMULO
 """import scipy.stats as stats
 if not hasattr(stats, 'binom_test'):
@@ -719,7 +719,7 @@ except Exception as e:
 
 # %%
 try:
-    experiment_name = "zero_shot_intra_month_fe"
+    experiment_name = "zero_shot_intra_month"
 
     # Verificar si el experimento ya fue ejecutado
     should_run, reason, existing_stats = should_run_experiment(experiment_name, results_file, min_seeds=5)
@@ -739,6 +739,11 @@ try:
             intra_month_transformer = IntraMonthTransformer()
             X_transformed = intra_month_transformer.fit_transform(X)
             logger.info(f"Cantidad de features después de intra month transformer: {len(X_transformed.columns)}")
+            logger.info("Iniciando dates transformer...")
+            dates_transformer = DatesTransformer(exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"])
+            X_transformed = dates_transformer.fit_transform(X_transformed)
+            logger.info(f"Cantidad de features después de dates transformer: {len(X_transformed.columns)}")
+            logger.info("Iniciando delta lag transformer...")
             delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2, exclude_cols= ["foto_mes", "numero_de_cliente", "target", "label", "weight"])
             X_transformed = delta_lag_transformer.fit_transform(X_transformed)
             logger.info(f"Cantidad de features después de delta lag transformer: {len(X_transformed.columns)}")
@@ -775,7 +780,7 @@ except Exception as e:
 # %%
 try:
         
-    experiment_name = "zero_shot_historical"
+    experiment_name = "zero_shot_historical_v2"
 
     # Verificar si el experimento ya fue ejecutado
     should_run, reason, existing_stats = should_run_experiment(experiment_name, results_file, min_seeds=5)
@@ -810,6 +815,10 @@ try:
             X_transformed = period_stats_transformer.fit_transform(X_transformed)
             new_columns = set(X_transformed.columns) - set(initial_columns)
             logger.info(f"Cantidad de features después de period stats transformer: {len(X_transformed.columns)}")
+            logger.info("Iniciando historical features transformer...")
+            historical_features_transformer = HistoricalFeaturesTransformer(exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"])
+            X_transformed = historical_features_transformer.fit_transform(X_transformed)
+            logger.info(f"Cantidad de features después de historical features transformer: {len(X_transformed.columns)}")
 
             return X_transformed
 
@@ -905,7 +914,7 @@ try:
         logging.info(f"▶️  Ejecutando experimento '{experiment_name}': {reason}")
         
         def get_features(X, training_months):
-            other_features_transformer = OtherFeaturesTransformer(exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"])
+            other_features_transformer = HistoricalFeaturesTransformer(exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"])
             X_transformed = other_features_transformer.fit_transform(X)
             logger.info(f"Cantidad de features después de other features transformer: {len(X_transformed.columns)}")
             logger.info("Iniciando delta lag transformer...")
@@ -1010,7 +1019,7 @@ try:
     # Verificar si tenemos suficientes elementos en is_good
     logging.info(f"Estado de is_good antes de Combined Winners: {is_good}")
     
-    if len(is_good) < 3:
+    if False:
         logging.warning(f"⚠️  No hay suficientes experimentos completados (is_good tiene {len(is_good)} elementos, se necesitan 3)")
         logging.info(f"⏭️  Salteando experimento '{experiment_name}'")
     else:
@@ -1018,7 +1027,7 @@ try:
         should_run, reason, existing_stats = should_run_experiment(experiment_name, results_file, min_seeds=5)
         
         # Verificar si al menos uno de los experimentos fue exitoso
-        any_good = is_good[0] or is_good[1] or is_good[2]
+        
         
         if not should_run:
             logging.info(f"⏭️  Salteando experimento '{experiment_name}': {reason}")
@@ -1028,7 +1037,7 @@ try:
     
         else:
             logging.info(f"▶️  Ejecutando experimento '{experiment_name}': {reason}")
-            logging.info(f"   Aplicando transformaciones: IntraMonth={is_good[0]}, Historical={is_good[1]}, RandomForest={is_good[2]}")
+            
             
             # Lista de booleanos para controlar qué procesamiento aplicar
             # Orden: [IntraMonth, Historical, RandomForest]
@@ -1047,7 +1056,7 @@ try:
                 
                 # 1. Other Features (si is_good[0])
                 logger.info("Aplicando Other Features...")
-                other_features_transformer = OtherFeaturesTransformer(exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"])
+                other_features_transformer = HistoricalFeaturesTransformer(exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"])
                 X_transformed = other_features_transformer.fit_transform(X_transformed)
                 logger.info(f"Cantidad de features después de Other Features: {len(X_transformed.columns)}")
                 # 2. Dates (si is_good[1])
@@ -1068,24 +1077,25 @@ try:
                 tendency_transformer = TendencyTransformer(exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"] + list(new_columns_after_deltalag))
                 X_transformed = tendency_transformer.fit_transform(X_transformed)
                 logger.info(f"Cantidad de features después de Tendency: {len(X_transformed.columns)}")
-                
+                """
                 logger.info("Aplicando PeriodStats...")
                 new_columns = set(X_transformed.columns) - initial_columns
                 period_stats_transformer = PeriodStatsTransformer(periods=[2, 3], exclude_cols=list(new_columns) + ["foto_mes", "numero_de_cliente", "target", "label", "weight"])
                 X_transformed = period_stats_transformer.fit_transform(X_transformed)
                 logger.info(f"Cantidad de features después de PeriodStats: {len(X_transformed.columns)}")
-                
+                                """
                 # 4. RandomForest Features (si is_good[2])
+                logger.info("Aplicando Percentiles...")
+                percentiles_transformer = PercentileTransformer(n_bins=None)
+                X_transformed = percentiles_transformer.fit_transform(X_transformed)
+                logger.info(f"Cantidad de features después de Percentiles: {len(X_transformed.columns)}")
 
                 logger.info("Aplicando RandomForest Features...")
                 random_forest_features_transformer = RandomForestFeaturesTransformer(training_months=training_months)
                 X_transformed = random_forest_features_transformer.fit_transform(X_transformed)
                 logger.info(f"Cantidad de features después de RandomForest: {len(X_transformed.columns)}")
                 
-                logger.info("Aplicando Percentiles...")
-                percentiles_transformer = PercentileTransformer(n_bins=None)
-                X_transformed = percentiles_transformer.fit_transform(X_transformed)
-                logger.info(f"Cantidad de features después de Percentiles: {len(X_transformed.columns)}")
+                
                 return X_transformed
             
             # Preparar datos
