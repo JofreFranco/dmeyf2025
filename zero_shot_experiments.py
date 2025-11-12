@@ -34,7 +34,7 @@ logging.basicConfig(
 )
 
 debug_mode = False
-sampling_rate = 0.25
+sampling_rate = 0.02
 logging.info("comenzando")
 
 # Alphas para early stopping
@@ -45,14 +45,14 @@ ALPHA_2 = 0.05  # Alpha más exigente
 # # Read data
 
 # %%
-df = pd.read_csv('data/competencia_01_target.csv')
+df = pd.read_csv('/datasets/competencia_02_target.csv')
 df = df.drop(columns=["mprestamos_personales", "cprestamos_personales"])
 weight = {"BAJA+1": 1, "BAJA+2": 1.00002, "CONTINUA": 1}
 df["target"] = ((df["clase_ternaria"] == "BAJA+2") | (df["clase_ternaria"] == "BAJA+1")).astype(int)
 
-training_months = [202101, 202102]
-eval_month = 202104
-test_month = 202106
+training_months = [202008, 202009, 202010, 202011,202012, 202101, 202102, 202103, 202104]
+eval_month = 202106
+test_month = 202108
 seeds = [537919, 923347, 173629, 419351, 287887, 1244, 24341, 1241, 4512, 6554, 62325, 6525235, 14, 4521, 474574, 74543, 32462, 12455, 5124, 55678]
 if debug_mode:
     # Sample 0.5% of target=0 cases per month, keep all target=1 rows
@@ -353,7 +353,7 @@ def zero_shot_experiment(experiment_name, seeds, results_file, fieldnames, setti
                     writer.writeheader()
                 writer.writerow(result_row)
             if save_model:
-                joblib.dump(model, f"models/{experiment_name}_{seed}.pkl")
+                joblib.dump(model, f"~/buckets/b1/models/{experiment_name}_{seed}.pkl")
                 save_model = False
             gc.collect()
         
@@ -469,7 +469,7 @@ settings = {
     "n_jobs": -1,
 }
 
-results_file = "results.csv"
+results_file = "~/buckets/b1/results.csv"
 fieldnames = ["experiment_name", "seed", "training_time", "hyperparameters", "moving_average_rev", "mean_over_best_gain"]
 
 # Inicializar lista is_good vacía para ir pasando entre experimentos
@@ -557,104 +557,7 @@ except Exception as e:
     logging.info(f"   Continuando con el siguiente experimento...\n")
     mean_rev = None
     total_time = None
-# %% Percentiles 5
-# # Percentiles 5
-# 
-# - Sacar prestamos personales
-# - Pasar ceros a Nan en los casos que corresponda
-# - Lags y Delta Lags de orden 2
-# - Percentiles discretizados en saltos de 5
-# 
-# 
 
-# %%
-try:
-    experiment_name = "zero_shot_percentiles_5_isolated"
-
-    # Verificar si el experimento ya fue ejecutado
-    should_run, reason, existing_stats = should_run_experiment(experiment_name, results_file, min_seeds=5)
-    if not should_run:
-        logging.info(f"⏭️  Salteando experimento '{experiment_name}': {reason}")
-        logging.info(f"   Ganancia promedio: {existing_stats['mean_gain']:,.0f}, Tiempo total: {existing_stats['total_time']:.2f}s")
-        mean_rev = existing_stats['mean_gain']
-        total_time = existing_stats['total_time']
-    else:
-        logging.info(f"▶️  Ejecutando experimento '{experiment_name}': {reason}")
-        
-        def get_features(X, training_months):
-            logger.info("Iniciando delta lag transformer...")
-            delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2, exclude_cols= ["foto_mes", "numero_de_cliente", "target", "label", "weight"])
-            X_transformed = delta_lag_transformer.fit_transform(X)
-            logger.info(f"Cantidad de features después de delta lag transformer: {len(X_transformed.columns)}")
-
-            # Percentiles discretizados en saltos de 5
-            percentiles_transformer = PercentileTransformer(n_bins=5)
-            X_transformed = percentiles_transformer.fit_transform(X_transformed)
-            logger.info(f"Cantidad de features después de percentiles transformer: {len(X_transformed.columns)}")
-            return X_transformed
-
-        # %%
-        X_train, y_train, w_train, X_eval, y_eval, w_eval, X_test, y_test = prepare_data(df, training_months, eval_month, test_month, get_features)
-
-        # %%
-        mean_rev, total_time, _ = zero_shot_experiment(experiment_name, seeds, results_file, fieldnames, settings, X_train, y_train, w_train, X_eval, y_eval, w_eval, enable_early_stopping=True)
-        print(f"Ganancia promedio: {mean_rev}, Tiempo total: {total_time}")
-
-    ganancia_intra_month_5 = mean_rev
-except Exception as e:
-    logging.error(f"❌ ERROR en experimento '{experiment_name}': {str(e)}")
-    logging.info(f"   Continuando con el siguiente experimento...\n")
-    mean_rev = None
-    total_time = None
-# %% Percentiles 1
-# # Percentiles 1
-# 
-# - Sacar prestamos personales
-# - Pasar ceros a Nan en los casos que corresponda
-# - Lags y Delta Lags de orden 2
-# - Percentiles discretizados en saltos de 1
-# 
-# 
-
-# %%
-try:
-    experiment_name = "zero_shot_percentiles_1_isolated"
-
-    # Verificar si el experimento ya fue ejecutado
-    should_run, reason, existing_stats = should_run_experiment(experiment_name, results_file, min_seeds=5)
-    if not should_run:
-        logging.info(f"⏭️  Salteando experimento '{experiment_name}': {reason}")
-        logging.info(f"   Ganancia promedio: {existing_stats['mean_gain']:,.0f}, Tiempo total: {existing_stats['total_time']:.2f}s")
-        mean_rev = existing_stats['mean_gain']
-        total_time = existing_stats['total_time']
-    else:
-        logging.info(f"▶️  Ejecutando experimento '{experiment_name}': {reason}")
-        
-        def get_features(X, training_months):
-            logger.info("Iniciando delta lag transformer...")
-            delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2, exclude_cols= ["foto_mes", "numero_de_cliente", "target", "label", "weight"])
-            X_transformed = delta_lag_transformer.fit_transform(X)
-            logger.info(f"Cantidad de features después de delta lag transformer: {len(X_transformed.columns)}")
-
-            # Percentiles discretizados en saltos de 1
-            percentiles_transformer = PercentileTransformer(n_bins=1)
-            X_transformed = percentiles_transformer.fit_transform(X_transformed)
-            logger.info(f"Cantidad de features después de percentiles transformer: {len(X_transformed.columns)}")
-            return X_transformed
-
-        # %%
-        X_train, y_train, w_train, X_eval, y_eval, w_eval, X_test, y_test = prepare_data(df, training_months, eval_month, test_month, get_features)
-
-        # %%
-        mean_rev, total_time, _ = zero_shot_experiment(experiment_name, seeds, results_file, fieldnames, settings, X_train, y_train, w_train, X_eval, y_eval, w_eval, enable_early_stopping=True)
-        print(f"Ganancia promedio: {mean_rev}, Tiempo total: {total_time}")
-
-    ganancia_intra_month_1 = mean_rev
-except Exception as e:
-    logging.error(f"❌ ERROR en experimento '{experiment_name}': {str(e)}")
-    logging.info(f"   Continuando con el siguiente experimento...\n")
-    mean_rev = None
-    total_time = None
 # %% Percentiles None
 # # Percentiles None
 # 
