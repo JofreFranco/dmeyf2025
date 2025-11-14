@@ -198,7 +198,9 @@ def prepare_data(df, training_months, eval_month, test_month, get_features, weig
     del df_test
     gc.collect()
 
-    X_train, y_train = SamplerProcessor(sampling_rate).fit_transform(X_train, y_train)
+    X_train, y_train = SamplerProcessor(sampling_rate).fit_transform(df_train.drop(columns=["label", "weight"]), df_train["label"])
+    del df_train
+    gc.collect()
     w_train = X_train["weight"]
     X_train = X_train.drop(columns=["weight"])
     return X_train, y_train, w_train, X_eval, y_eval, w_eval, X_test, y_test
