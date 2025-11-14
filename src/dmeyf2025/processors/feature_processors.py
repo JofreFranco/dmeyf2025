@@ -9,7 +9,28 @@ from ..utils.data_dict import ALL_CAT_COLS, EXCLUDE_COLS
 
 import logging
 logger = logging.getLogger(__name__)
-
+# Función para calcular percentiles con la lógica especial
+def calculate_percentile_with_sign(group, n_bins=None):
+    # Inicializar con NaN
+    result = pd.Series(np.nan, index=group.index)
+    
+    # Los ceros permanecen como 0
+    zero_mask = group == 0
+    result[zero_mask] = 0
+    
+    # Valores positivos
+    pos_mask = group > 0
+    if pos_mask.any():
+        pos_values = group[pos_mask]
+        # Calcular percentil rank (0-100)
+        pos_percentiles = pos_values.rank(pct=True, method='average') * 100
+        # Discretizar en saltos de n_bins
+        if n_bins is not None:
+            pos_percentiles_discrete = (pos_percentiles / n_bins).round() * n_bins
+            result[pos_mask] = pos_percentiles_discrete
+        else:
+            result[pos_mask] = pos_percentiles
+    return result
 class BaseTransformer(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
         return self
@@ -62,7 +83,7 @@ class CleanZerosTransformer(BaseTransformer):
         if not isinstance(X, pd.DataFrame):
             raise ValueError("X debe ser un pandas DataFrame")
         
-        X_transformed = X.copy()
+        X_transformed = X
         
         # Para cada par detectado, limpiar los montos cuando cantidad = 0
         for c_col, m_col in self.variable_pairs_:
@@ -143,13 +164,12 @@ class PercentileTransformer(BaseTransformer):
         
         return self
     
-    def _transform(self, X):
+    def _transform(self, X_transformed):
 
-        if not isinstance(X, pd.DataFrame):
+        if not isinstance(X_transformed, pd.DataFrame):
             raise ValueError("X debe ser un pandas DataFrame")
             
-        X_transformed = X.copy()
-        
+
         # Verificar que existe la columna foto_mes
         if 'foto_mes' not in X_transformed.columns:
             raise ValueError("El DataFrame debe contener la columna 'foto_mes'")
@@ -163,28 +183,7 @@ class PercentileTransformer(BaseTransformer):
                 else:
                     target_col_name = f'{col}_percentile'
                 
-                # Función para calcular percentiles con la lógica especial
-                def calculate_percentile_with_sign(group):
-                    # Inicializar con NaN
-                    result = pd.Series(np.nan, index=group.index)
-                    
-                    # Los ceros permanecen como 0
-                    zero_mask = group == 0
-                    result[zero_mask] = 0
-                    
-                    # Valores positivos
-                    pos_mask = group > 0
-                    if pos_mask.any():
-                        pos_values = group[pos_mask]
-                        # Calcular percentil rank (0-100)
-                        pos_percentiles = pos_values.rank(pct=True, method='average') * 100
-                        # Discretizar en saltos de n_bins
-                        if self.n_bins is not None:
-                            pos_percentiles_discrete = (pos_percentiles / self.n_bins).round() * self.n_bins
-                            result[pos_mask] = pos_percentiles_discrete
-                        else:
-                            result[pos_mask] = pos_percentiles
-                    return result
+                
                 
                 # Aplicar la transformación agrupada por foto_mes
                 X_transformed[target_col_name] = X_transformed.groupby('foto_mes')[col].transform(
@@ -252,7 +251,7 @@ class LagTransformer(BaseTransformer):
         if not isinstance(X, pd.DataFrame):
             raise ValueError("X debe ser un pandas DataFrame")
             
-        X_transformed = X.copy()
+        X_transformed = X
         
         # Preparar lista de nuevas columnas para concatenar
         new_columns = []
@@ -333,7 +332,7 @@ class DeltaTransformer(BaseTransformer):
         if not isinstance(X, pd.DataFrame):
             raise ValueError("X debe ser un pandas DataFrame")
             
-        X_transformed = X.copy()
+        X_transformed = X
         
         # Preparar lista de nuevas columnas para concatenar
         new_columns = []
@@ -382,7 +381,7 @@ class PeriodStatsTransformer(BaseTransformer):
         return self
     
     def _transform(self, X):
-        X = X.copy()
+
         numeric_cols = [col for col in X.select_dtypes(include='number').columns if col not in self.exclude_cols and col.startswith('m')]
         X.sort_values(['numero_de_cliente', 'foto_mes'], inplace=True)
         
@@ -430,7 +429,7 @@ class LegacyTendencyTransformer(BaseTransformer):
         if not isinstance(X, pd.DataFrame):
             raise ValueError("X debe ser un pandas DataFrame")
         
-        X_transformed = X.copy()
+        X_transformed = X
         X_transformed = X_transformed.sort_values(['numero_de_cliente', 'foto_mes'])
         
         # Función para calcular pendiente usando fórmula de mínimos cuadrados
@@ -496,7 +495,7 @@ class TendencyTransformer(BaseTransformer):
         if not isinstance(X, pd.DataFrame):
             raise ValueError("X debe ser un pandas DataFrame")
 
-        X = X.sort_values(['numero_de_cliente', 'foto_mes']).copy()
+        X = X.sort_values(['numero_de_cliente', 'foto_mes'])
         clientes = X['numero_de_cliente'].values
         new_cols = {}
 
@@ -548,7 +547,7 @@ class IntraMonthTransformer(BaseTransformer):
         return self
     
     def _transform(self, X):
-        X_transformed = X.copy()
+        X_transformed = X
         # Ratios
         X_transformed["ratio_rentabilidad_activos"] = X_transformed["mrentabilidad_annual"] / (X_transformed["mactivos_margen"] + np.finfo(float).eps)
         X_transformed["ratio_rentabilidad_pasivos"] = X_transformed["mrentabilidad_annual"] / (X_transformed["mpasivos_margen"] + np.finfo(float).eps)
@@ -585,7 +584,7 @@ class HistoricalFeaturesTransformer(BaseTransformer):
         return self
 
     def _transform(self, X):
-        X_transformed = X.copy()
+        X_transformed = X
         
         # Promedios móviles de transacciones con tarjetas
         X_transformed = X_transformed.sort_values(["numero_de_cliente", "foto_mes"])
@@ -656,7 +655,7 @@ class DatesTransformer(BaseTransformer):
         return self
     
     def _transform(self, X):
-        X_transformed = X.copy()
+        X_transformed = X
         X_transformed["Master_fechaalta_meses"] = X_transformed["Master_fechaalta"].apply(lambda x: int(x / 28) if pd.notnull(x) else None)
         X_transformed["Visa_fechaalta_meses"] = X_transformed["Visa_fechaalta"].apply(lambda x: int(x / 28) if pd.notnull(x) else None)
         X_transformed["Master_recencia"] = X_transformed["cliente_antiguedad"] - X_transformed["Master_fechaalta_meses"]
@@ -703,7 +702,7 @@ class RandomForestFeaturesTransformer(BaseTransformer):
     
     def fit(self, X, y=None):
         logger.info(f"Entrenando RandomForestFeaturesTransformer con {self.training_months} meses")
-        X = X.copy()
+        X = X
         X_train = X.loc[X["foto_mes"].isin(self.training_months)]
         y = X_train["label"]
         self.keep_cols = [col for col in X_train.columns if col not in self.exclude_cols]
@@ -730,7 +729,7 @@ class RandomForestFeaturesTransformer(BaseTransformer):
         return self
     
     def _transform(self, X):
-        X = X.copy()
+        X = X
         extra_cols = set(X.columns) - set(self.keep_cols)
         extra_cols = X[list(extra_cols)]
         X = X[self.keep_cols]
@@ -764,7 +763,7 @@ class AddCanaritos(BaseTransformer):
         return self
 
     def _transform(self, X):
-        X_transformed = X.copy()
+        X_transformed = X
         other_cols = list(X_transformed.columns)
         canarito_cols = []
         for i in range(self.n_canaritos):

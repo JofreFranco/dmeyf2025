@@ -2,14 +2,14 @@ import logging
 import os
 import csv
 import joblib
+import psutil
 import gc
 import pandas as pd
 import numpy as np
 import time
 import lightgbm as lgb
 from dmeyf2025.processors.feature_processors import CleanZerosTransformer, DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer, TendencyTransformer, IntraMonthTransformer, RandomForestFeaturesTransformer, DatesTransformer, HistoricalFeaturesTransformer, AddCanaritos
-from dmeyf2025.metrics.revenue import GANANCIA_ACIERTO, COSTO_ESTIMULO
-from dmeyf2025.processors.sampler import SamplerProcessor
+
 from dmeyf2025.metrics.revenue import gan_eval
 from dmeyf2025.etl.etl import prepare_data
 
@@ -173,6 +173,15 @@ logger.info("Preparando datos")
 X_train, y_train, w_train, X_eval, y_eval, w_eval, X_test, y_test = prepare_data(df, training_months, eval_month, test_month, get_features, weight, sampling_rate)
 del df
 gc.collect()
+
+
+try:
+    mem = psutil.virtual_memory()
+    logger.info(f"Sistema RAM: {mem.percent:.1f}% usado, {mem.available / (1024**3):.2f} GB disponibles, total {mem.total / (1024**3):.2f} GB")
+except Exception as e:
+    logger.warning(f"No se pudo leer estado de la RAM: {e}")
+
+
 logger.info("Agregando canaritos")
 X_train = AddCanaritos(n_canaritos=canaritos).fit_transform(X_train)
 X_eval = AddCanaritos(n_canaritos=canaritos).fit_transform(X_eval) 

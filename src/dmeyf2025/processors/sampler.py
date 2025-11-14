@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import Any, Optional
-
+import gc
 import pandas as pd
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -54,13 +54,13 @@ class SamplerProcessor(BaseEstimator, TransformerMixin):
             return X, y
 
         # Construimos un DataFrame que incluye y para facilitar muestreo conjunto
-        df_sampled = X.copy()
+        df_sampled = X
         df_sampled['label'] = y
 
         # Separar clases
         continua_mask = df_sampled['label'] == 0
-        other_classes = df_sampled[~continua_mask].copy()
-        continua_cases = df_sampled[continua_mask].copy()
+        other_classes = df_sampled[~continua_mask]
+        continua_cases = df_sampled[continua_mask]
         n_continua_keep = int(len(continua_cases) * self.sample_ratio)
 
         # Hacer sampling de casos CONTINUA
@@ -76,16 +76,14 @@ class SamplerProcessor(BaseEstimator, TransformerMixin):
 
         # Combinar datasets
         df_final = pd.concat([other_classes, continua_sampled], ignore_index=True)
+        del other_classes, continua_cases, continua_mask, df_sampled
+        gc.collect()
 
         logger.info(f"✅ Dataset final: {len(df_final)} registros")
         logger.info(f"   - Clase positiva: {(df_final['label'] == 1).sum()}")
         logger.info(f"   - Clase negativa: {(df_final['label'] == 0).sum()}")
-
-        # Extraer X_sampled (quitando la columna de clase) e y_sampled
-        X_sampled = df_final.drop(columns=['label'])
-        y_sampled = df_final['label']
-
-        return X_sampled, y_sampled
+        
+        return df_final.drop(columns=['label']), df_final['label']
 
        
     def fit_transform(self, X: pd.DataFrame, y: Optional[Any] = None) -> pd.DataFrame:
