@@ -30,37 +30,84 @@ eval_month = 202106
 test_month = 202108
 seeds = [537919, 923347, 173629, 419351, 287887, 1244, 24341, 1241, 4512, 6554, 62325, 6525235, 14, 4521, 474574, 74543, 32462, 12455, 5124, 55678]
 debug_mode = False
-sampling_rate = 0.1
+sampling_rate = 0.02
 results_file = "/home/martin232009/buckets/b1/results.csv"
 fieldnames = ["experiment_name", "seed", "training_time", "moving_average_rev"]
 logging.info("comenzando")
 features_to_drop = ["cprestamos_prendarios", "mprestamos_prendarios", "cprestamos_personales", "mprestamos_personales"]
 canaritos = 10
-grouding_bound = 0.1
+gradient_bound = 0.2
 n_seeds = 5
 params = {
     "canaritos": canaritos,
-    "grouding_bound": grouding_bound,
+    "gradient_bound": gradient_bound,
     "feature_fraction": 0.50,
-    "min_data_in_leaf": 20,
+    "min_data_in_leaf": 2000,
 }
+
+
+def memory_gb(df: pd.DataFrame) -> float:
+    return df.memory_usage().sum() / (1024 ** 3)
+
+def apply_transformer(transformer, X, name: str, logger):
+    logger.info(f"[{name}] Iniciando…")
+
+    start_mem = memory_gb(X)
+    start_time = time.time()
+
+    Xt = transformer.fit_transform(X)
+
+    end_time = time.time()
+    end_mem = memory_gb(Xt)
+
+    n_rows, n_cols = Xt.shape
+
+    logger.info(
+        f"[{name}] Tiempo: {end_time - start_time:.2f}s | "
+        f"Memoria antes: {start_mem:.3f} GB | "
+        f"Memoria después: {end_mem:.3f} GB | "
+        f"Diferencia: {end_mem - start_mem:+.3f} GB | "
+        f"Shape: {n_rows:,} filas × {n_cols:,} columnas"
+    )
+
+    return Xt
+
+experiment_name = f"{experiment_name}_c{canaritos}_gb{experiment_name}_s{sampling_rate}"
 def get_features(X, training_months):
-    logger.info("Iniciando clean zeros transformer...")
-    clean_zeros_transformer = CleanZerosTransformer()
-    X_transformed = clean_zeros_transformer.fit_transform(X)
-    logger.info("Iniciando delta lag transformer...")
-    delta_lag_transformer = DeltaLagTransformer(n_deltas=2, n_lags=2, exclude_cols= ["foto_mes", "numero_de_cliente", "target", "label", "weight", "clase_ternaria"])
-    X_transformed = delta_lag_transformer.fit_transform(X_transformed)
+
+    X_transformed = X
+
+    X_transformed = apply_transformer(
+        CleanZerosTransformer(),
+        X_transformed,
+        "CleanZerosTransformer",
+        logger
+    )
+
+    X_transformed = apply_transformer(
+        DeltaLagTransformer(
+            n_deltas=2,
+            n_lags=2,
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"]
+        ),
+        X_transformed,
+        "DeltaLagTransformer",
+        logger
+    )
     logger.info(f"Cantidad de features después de delta lag transformer: {len(X_transformed.columns)}")
-    # Percentiles discretizados en saltos de None
-    logger.info("Iniciando percentiles transformer...")
-    percentiles_transformer = PercentileTransformer(n_bins=None, replace_original=True)
-    original_columns = len(X_transformed.columns)
-    X_transformed = percentiles_transformer.fit_transform(X_transformed)
-    if len(X_transformed.columns) != original_columns:
-        raise ValueError(f"Cantidad de features después de percentiles transformer: {len(X_transformed.columns)} != {original_columns}")
-    
+
+    X_transformed = apply_transformer(
+        PercentileTransformer(
+            n_bins=None,
+            replace_original=True
+        ),
+        X_transformed,
+        "PercentileTransformer",
+        logger
+    )
+
     return X_transformed
+
 
 
 def train_model(train_set, params):
@@ -105,8 +152,7 @@ def train_model(train_set, params):
     
     gbm = lgb.train(
         lgb_params,
-        train_set,
-        verbose_eval=False
+        train_set
     )
     return gbm
 
@@ -125,13 +171,16 @@ df["target"] = ((df["clase_ternaria"] == "BAJA+2") | (df["clase_ternaria"] == "B
 start_time = time.time()
 logger.info("Preparando datos")
 X_train, y_train, w_train, X_eval, y_eval, w_eval, X_test, y_test = prepare_data(df, training_months, eval_month, test_month, get_features, weight, sampling_rate)
+del df
+gc.collect()
 logger.info("Agregando canaritos")
 X_train = AddCanaritos(n_canaritos=canaritos).fit_transform(X_train)
-
+X_eval = AddCanaritos(n_canaritos=canaritos).fit_transform(X_eval) 
 logger.info("Datos pre procesados en tiempo: %s", time.time() - start_time)
 # loggear uso de memoria del dataset
 try:
-    logger.info(f"Uso de memoria del dataset: {X_train.memory_usage().sum()}")
+    mem_gb = X_train.memory_usage().sum() / (1024 ** 3)
+    logger.info(f"Uso de memoria del dataset: {mem_gb:.2f} GB")
 except:
     logger.info("No se pudo calcular el uso de memoria del dataset")
 
@@ -143,8 +192,8 @@ for seed in seeds[:n_seeds]:
     params["seed"] = seed
     start_time = time.time()
     logger.info(f"Entrenando modelo con seed: {seed}")
-    model = train_model(X_train, y_train, w_train, params)
-    y_pred = model.predict_proba(X_eval)[:,1]
+    model = train_model(train_set, params)
+    y_pred = model.predict(X_eval)[:,1]
     rev, _ = gan_eval(y_pred, w_eval, window=2001)
     revs.append(rev)
 
