@@ -6,6 +6,7 @@ import gc
 import pandas as pd
 import numpy as np
 import time
+import lightgbm as lgb
 from dmeyf2025.processors.feature_processors import CleanZerosTransformer, DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer, TendencyTransformer, IntraMonthTransformer, RandomForestFeaturesTransformer, DatesTransformer, HistoricalFeaturesTransformer, AddCanaritos
 from dmeyf2025.metrics.revenue import GANANCIA_ACIERTO, COSTO_ESTIMULO
 from dmeyf2025.processors.sampler import SamplerProcessor
@@ -62,7 +63,7 @@ def get_features(X, training_months):
     return X_transformed
 
 
-def train_model(X_train, y_train, w_train, params):
+def train_model(train_set, params):
     """
     Entrena un modelo ZuperLightGBM (lgbm)
     Args:
@@ -101,7 +102,7 @@ def train_model(X_train, y_train, w_train, params):
         "gradient_bound": params["gradient_bound"],  
     }
 
-    train_set = lgb.Dataset(X_train, label=y_train, weight=w_train)
+    
     gbm = lgb.train(
         lgb_params,
         train_set,
@@ -137,6 +138,7 @@ except:
 # Eliminar features con canaritos
 # TODO: Implementar
 revs = []
+train_set = lgb.Dataset(X_train, label=y_train, weight=w_train)
 for seed in seeds[:n_seeds]:
     params["seed"] = seed
     start_time = time.time()
