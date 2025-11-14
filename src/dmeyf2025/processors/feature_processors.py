@@ -965,10 +965,19 @@ class AddCanaritos(BaseTransformer):
         X_transformed = X
         other_cols = list(X_transformed.columns)
         canarito_cols = []
+        new_columns = {}
         for i in range(self.n_canaritos):
             col_name = f"canarito_{i}"
-            X_transformed[col_name] = np.random.rand(len(X_transformed))
+            new_columns[col_name] = np.random.rand(len(X_transformed))
             canarito_cols.append(col_name)
-        # Reordenar columnas: primero los canaritos, luego el resto
-        X_transformed = X_transformed[canarito_cols + other_cols]
+        # Crear un solo diccionario con todas las columnas
+        full_columns = {}
+        # Primero los canaritos
+        for col_name in canarito_cols:
+            full_columns[col_name] = new_columns[col_name]
+        # Luego las columnas originales
+        for col_name in other_cols:
+            full_columns[col_name] = X_transformed[col_name]
+        # Consolidar dataframe de una sola vez para evitar fragmentación
+        X_transformed = pd.DataFrame(full_columns, index=X_transformed.index)
         return X_transformed

@@ -81,7 +81,7 @@ def gan_eval(y_pred, weight, window=2001):
     Retorna el mejor valor encontrado.
     """
     ganancia = np.where(weight == 1.00002, GANANCIA_ACIERTO, 0) - np.where(weight < 1.00002, COSTO_ESTIMULO, 0)
-    ganancia = ganancia[np.argsort(y_pred)[::-1]]
+    ganancia = ganancia[np.argsort(y_pred)]
     ganancia = np.cumsum(ganancia)
     sends = np.argmax(ganancia)
     opt_sends = np.argmax(ganancia)

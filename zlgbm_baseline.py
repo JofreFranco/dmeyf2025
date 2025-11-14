@@ -69,7 +69,7 @@ def apply_transformer(transformer, X, name: str, logger):
         f"Diferencia: {end_mem - start_mem:+.3f} GB | "
         f"Shape: {n_rows:,} filas × {n_cols:,} columnas"
     )
-
+    gc.collect()
     return Xt
 
 experiment_name = f"{experiment_name}_c{canaritos}_gb{experiment_name}_s{sampling_rate}"
@@ -86,7 +86,6 @@ def get_features(X, training_months):
 
     X_transformed = apply_transformer(
         DeltaLagTransformer(
-            n_deltas=2,
             n_lags=2,
             exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"]
         ),
@@ -201,9 +200,16 @@ for seed in seeds[:n_seeds]:
     start_time = time.time()
     logger.info(f"Entrenando modelo con seed: {seed}")
     model = train_model(train_set, params)
-    y_pred = model.predict(X_eval)[:,1]
-    rev, _ = gan_eval(y_pred, w_eval, window=2001)
-    revs.append(rev)
+    try:
+        y_pred = model.predict(X_eval)[:,1]
+        rev, _ = gan_eval(y_pred, w_eval, window=2001)
+        revs.append(rev)
+    except Exception as e:
+        logger.info(y_pred.shape)
+        logger.info(y_pred)
+        logger.info(f"time: {time.time()- start_time}")
+        logger.error(f"Error al predecir: {e}")
+        raise e
 
     write_header = not os.path.exists(results_file)
     
