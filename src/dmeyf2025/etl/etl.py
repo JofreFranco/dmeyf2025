@@ -2,8 +2,9 @@ import logging
 from os.path import exists
 import pandas as pd
 import os
+import numpy as np
 from sklearn.pipeline import Pipeline
-
+from dmeyf2025.processors.sampler import SamplerProcessor
 logger = logging.getLogger(__name__)
 
 
@@ -174,6 +175,33 @@ class ETL:
         logger.info("Pipeline ETL completado exitosamente!")
         return X, y
 
+def prepare_data(df, training_months, eval_month, test_month, get_features, weight, sampling_rate):
+    df = df.copy()
+    df["label"] = ((df["clase_ternaria"] == "BAJA+2") | (df["clase_ternaria"] == "BAJA+1")).astype(int)
+    df["weight"] = np.array([weight[item] for item in df["clase_ternaria"]])
+    df = df.drop(columns=["clase_ternaria"])
+    df_transformed = get_features(df, training_months)
+    if training_months is not None:
+        df_train = df_transformed[df_transformed["foto_mes"].isin(training_months)]
+    else:
+        df_train = df_transformed[~df_transformed["foto_mes"].isin([eval_month, test_month])]
+    df_eval = df_transformed[df_transformed["foto_mes"] == eval_month]
+    df_test = df_transformed[df_transformed["foto_mes"] == test_month]
+    y_eval = df_eval["label"]
 
+    w_eval = df_eval["weight"]
+    X_eval = df_eval.drop(columns=["label", "weight"])
+
+
+    y_test = df_test["label"]
+    w_test = df_test["weight"]
+    X_test = df_test.drop(columns=["label", "weight"])
+
+    y_train = df_train["label"]
+    X_train = df_train.drop(columns=["label"])
+    X_train, y_train = SamplerProcessor(sampling_rate).fit_transform(X_train, y_train)
+    w_train = X_train["weight"]
+    X_train = X_train.drop(columns=["weight"])
+    return X_train, y_train, w_train, X_eval, y_eval, w_eval, X_test, y_test
 if __name__ == "__main__":
     pass

@@ -74,3 +74,35 @@ def sends_optimization(y_pred, weight):
     ganancia = ganancia[np.argsort(y_pred)[::-1]]
     ganancia = np.cumsum(ganancia)
     return np.argmax(ganancia), np.max(ganancia)
+
+def gan_eval(y_pred, weight, window=2001):
+    """
+    Evalúa la ganancia máxima usando una media móvil centrada con ventana de tamaño `window`.
+    Retorna el mejor valor encontrado.
+    """
+    ganancia = np.where(weight == 1.00002, GANANCIA_ACIERTO, 0) - np.where(weight < 1.00002, COSTO_ESTIMULO, 0)
+    ganancia = ganancia[np.argsort(y_pred)[::-1]]
+    ganancia = np.cumsum(ganancia)
+    sends = np.argmax(ganancia)
+    opt_sends = np.argmax(ganancia)
+    if opt_sends - (window-1)/2 < 0:
+        min_sends = 0
+    else:
+        min_sends = int(opt_sends - (window-1)/2)
+    if opt_sends + (window-1)/2 > len(ganancia):
+        max_sends = len(ganancia)
+    else:
+        max_sends = int(opt_sends + (window-1)/2)
+    
+    mean_ganancia = np.mean(ganancia[min_sends:max_sends])
+    # Calcula la media móvil centrada con la ventana especificada
+    ventana = window
+    pad = ventana // 2
+    ganancia_padded = np.pad(ganancia, (pad, ventana - pad - 1), mode='edge')
+    # Calcula la media móvil centrada
+    medias_moviles = np.convolve(ganancia_padded, np.ones(ventana)/ventana, mode='valid')
+
+
+    # Obtiene el máximo de la media móvil centrada
+    mejor_ganancia = np.max(medias_moviles)
+    return mejor_ganancia, mean_ganancia

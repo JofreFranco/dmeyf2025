@@ -27,6 +27,8 @@ class CleanZerosTransformer(BaseTransformer):
     
     Esto evita que el modelo aprenda relaciones incorrectas donde hay montos
     en 0 que en realidad deberían ser valores nulos (porque no existe la operación).
+
+    Además limpia el mes 202006 que tiene muchas variables rotas en 0, se pasan a Nan y también se limpia la variable de mobile app que se invirtió, poniendo antes de la inversión todo en Nan
     """
     def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         self.exclude_cols = exclude_cols
@@ -71,6 +73,13 @@ class CleanZerosTransformer(BaseTransformer):
                 # Poner el monto en None donde la cantidad es 0
                 X_transformed.loc[zero_mask, m_col] = np.nan
         
+        # Limpiar antes del mes 202010 tmobile_app
+        X_transformed.loc[X_transformed["foto_mes"] < 202010, "tmobile_app"] = np.nan
+
+        # Limpiar variables rotas del 202006
+        #detectar todas las columnas que son SOLO 0 en el 202006
+        zero_cols = X_transformed[X_transformed["foto_mes"] == 202006].columns[X_transformed[X_transformed["foto_mes"] == 202006].apply(lambda x: x.nunique()) == 1]
+        X_transformed.loc[X_transformed["foto_mes"] == 202006, zero_cols] = np.nan        
         return X_transformed
 
 class PercentileTransformer(BaseTransformer):
@@ -467,9 +476,7 @@ class LegacyTendencyTransformer(BaseTransformer):
 
 class TendencyTransformer(BaseTransformer):
     """
-    Calcula la pendiente de regresión lineal de cada variable numérica para cada cliente.
-    Usa una ventana expanding: para cada mes, calcula la tendencia usando todos los datos históricos.
-    Implementación vectorizada con NumPy (sin apply ni loops internos lentos).
+    Calcula la pendiente de regresión lineal de cada variable numérica para cada cliente usando una ventana de 6 meses.
     """
     def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         self.exclude_cols = exclude_cols
@@ -546,13 +553,11 @@ class IntraMonthTransformer(BaseTransformer):
         X_transformed["ratio_rentabilidad_activos"] = X_transformed["mrentabilidad_annual"] / (X_transformed["mactivos_margen"] + np.finfo(float).eps)
         X_transformed["ratio_rentabilidad_pasivos"] = X_transformed["mrentabilidad_annual"] / (X_transformed["mpasivos_margen"] + np.finfo(float).eps)
         X_transformed["ratio_liquidez_relativa"] = X_transformed["mcuentas_saldo"] / (X_transformed["mpasivos_margen"] + np.finfo(float).eps)
-        X_transformed["ratio_endeudamiento_prestamos"] = (X_transformed["mprestamos_prendarios"] + X_transformed["mprestamos_hipotecarios"]) / (X_transformed["mactivos_margen"] + np.finfo(float).eps)
+        
         X_transformed["ratio_intensidad_credito"] = (X_transformed["mtarjeta_visa_consumo"] + X_transformed["mtarjeta_master_consumo"]) / (X_transformed["Visa_mlimitecompra"] + X_transformed["Master_mlimitecompra"] + np.finfo(float).eps)
     
         # Totals
         X_transformed["total_limite_credito"] = X_transformed["Visa_mlimitecompra"] + X_transformed["Master_mlimitecompra"]
-
-        X_transformed["total_prestamos"] =  X_transformed["mprestamos_prendarios"] + X_transformed["mprestamos_hipotecarios"]
 
         X_transformed["total_consumo_tarjetas"] = X_transformed["mtarjeta_visa_consumo"] + X_transformed["mtarjeta_master_consumo"]
     
