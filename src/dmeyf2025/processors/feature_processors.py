@@ -751,3 +751,21 @@ class RandomForestFeaturesTransformer(BaseTransformer):
             X = pd.concat([X, extra_cols], axis=1)
         
         return X
+class AddCanaritos(BaseTransformer):
+    def __init__(self, n_canaritos=10):
+        self.n_canaritos = n_canaritos
+
+    def fit(self, X, y=None):
+        return self
+
+    def _transform(self, X):
+        X_transformed = X.copy()
+        other_cols = list(X_transformed.columns)
+        canarito_cols = []
+        for i in range(self.n_canaritos):
+            col_name = f"canarito_{i}"
+            X_transformed[col_name] = np.random.rand(len(X_transformed))
+            canarito_cols.append(col_name)
+        # Reordenar columnas: primero los canaritos, luego el resto
+        X_transformed = X_transformed[canarito_cols + other_cols]
+        return X_transformed
