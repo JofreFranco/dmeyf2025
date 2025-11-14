@@ -103,39 +103,41 @@ class CleanZerosTransformer(BaseTransformer):
         X_transformed.loc[X_transformed["foto_mes"] == 202006, zero_cols] = np.nan        
         return X_transformed
 
+import numpy as np
+import pandas as pd
+from scipy import stats
+
 class PercentileTransformer(BaseTransformer):
     """
     Calcula el ranking percentil de cada cliente para cada variable, agrupado por mes.
-    Los percentiles se discretizan en saltos de 5% (0, 5, 10, 15, ..., 95, 100).
     - El valor 0 permanece como 0
-    - Los valores positivos se transforman a percentiles discretos
+    - Los valores positivos se transforman a percentiles (0-100)
     - Los valores negativos se transforman usando el valor absoluto y luego se aplica el signo negativo
     """
     
-    def __init__(self, variables=None, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"], replace_original=False, n_bins=5):
+    def __init__(self, variables=None, exclude_cols=None, replace_original=False):
         """
-        Aplica la transformación de percentiles discretizados en saltos de n_bins%.
+        Aplica la transformación de percentiles continuos.
         Para cada mes y cada variable:
         - El 0 permanece como 0
-        - Los valores positivos se rankean entre sí y se discretizan (0, 5, 10, ..., 100)
-        - Los valores negativos se rankean usando su valor absoluto, se discretizan y se les aplica signo negativo
+        - Los valores positivos se rankean entre sí (0-100)
+        - Los valores negativos se rankean usando su valor absoluto y se les aplica signo negativo (-100 a 0)
+        
         Parameters:
         -----------
         variables : list, optional
             Lista de variables para calcular percentiles. Si None, usa todas las numéricas
         exclude_cols : list, optional
-            Columnas a excluir. Si None, usa EXCLUDE_COLS
+            Columnas a excluir. Si None, usa ["foto_mes", "numero_de_cliente", "target", "label", "weight"]
         replace_original : bool, default=False
             Si True, reemplaza las columnas originales con los percentiles.
             Si False, crea nuevas columnas con sufijo '_percentile'
-        n_bins : int, default=5
-            Número de bins para discretizar los percentiles
         """
         self.variables = variables
-        self.exclude_cols = exclude_cols
+        self.exclude_cols = exclude_cols if exclude_cols is not None else ["foto_mes", "numero_de_cliente", "target", "label", "weight"]
         self.replace_original = replace_original
         self.selected_variables_ = None
-        self.n_bins = n_bins
+    
     def fit(self, X, y=None):
         """
         Identifica las variables para las cuales calcular percentiles.
@@ -153,44 +155,151 @@ class PercentileTransformer(BaseTransformer):
         """
         if not isinstance(X, pd.DataFrame):
             raise ValueError("X debe ser un pandas DataFrame")
+        
+        # Verificar que existe la columna foto_mes
+        if 'foto_mes' not in X.columns:
+            raise ValueError("El DataFrame debe contener la columna 'foto_mes'")
             
         # Seleccionar variables si no se especificaron
         if self.variables is None:
-            self.selected_variables_ = [col for col in X.columns 
-                                      if col not in self.exclude_cols and col not in ALL_CAT_COLS
-                                      and col.startswith('m')]
+            self.selected_variables_ = [
+                col for col in X.columns 
+                if col not in self.exclude_cols 
+                and col not in ALL_CAT_COLS
+                and col.startswith('m')
+                and pd.api.types.is_numeric_dtype(X[col])
+            ]
         else:
-            self.selected_variables_ = [col for col in self.variables if col in X.columns]
+            # Verificar que todas las variables existen
+            missing_cols = set(self.variables) - set(X.columns)
+            if missing_cols:
+                raise ValueError(f"Las siguientes variables no existen en X: {missing_cols}")
+            self.selected_variables_ = list(self.variables)
         
         return self
     
-    def _transform(self, X_transformed):
-
-        if not isinstance(X_transformed, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
+    def _calculate_percentile(self, values):
+        """
+        Calcula percentiles continuos con manejo de ceros y negativos.
+        Optimizado para velocidad y memoria.
+        
+        Parameters:
+        -----------
+        values : np.ndarray
+            Array de valores a transformar
             
-
+        Returns:
+        --------
+        np.ndarray
+            Array de percentiles (float32)
+        """
+        n = len(values)
+        if n == 0:
+            return np.array([], dtype=np.float32)
+        
+        # Inicializar resultado con ceros
+        result = np.zeros(n, dtype=np.float32)
+        
+        # Identificar ceros (ya están en 0, no hacer nada)
+        non_zero_mask = values != 0
+        
+        if not non_zero_mask.any():
+            return result
+        
+        # Separar positivos y negativos
+        pos_mask = values > 0
+        neg_mask = values < 0
+        
+        # Procesar valores positivos
+        if pos_mask.any():
+            pos_values = values[pos_mask]
+            # Usar rankdata de scipy (más rápido que pandas)
+            pos_ranks = stats.rankdata(pos_values, method='average')
+            # Calcular percentiles (0-100)
+            if len(pos_values) > 1:
+                pos_percentiles = (pos_ranks - 1) / (len(pos_values) - 1) * 100
+            else:
+                pos_percentiles = np.array([50.0])
+            result[pos_mask] = pos_percentiles.astype(np.float32)
+        
+        # Procesar valores negativos (rankear por valor absoluto)
+        if neg_mask.any():
+            neg_values = np.abs(values[neg_mask])
+            neg_ranks = stats.rankdata(neg_values, method='average')
+            # Calcular percentiles y aplicar signo negativo
+            if len(neg_values) > 1:
+                neg_percentiles = (neg_ranks - 1) / (len(neg_values) - 1) * 100
+            else:
+                neg_percentiles = np.array([50.0])
+            result[neg_mask] = -neg_percentiles.astype(np.float32)
+        
+        return result
+    
+    def _transform(self, X):
+        """
+        Aplica la transformación de percentiles.
+        
+        Parameters:
+        -----------
+        X : pd.DataFrame
+            DataFrame de entrada
+            
+        Returns:
+        --------
+        pd.DataFrame
+            DataFrame transformado
+        """
+        if not isinstance(X, pd.DataFrame):
+            raise ValueError("X debe ser un pandas DataFrame")
+        
+        if self.selected_variables_ is None:
+            raise ValueError("El transformador no ha sido ajustado. Llame a fit() primero.")
+        
         # Verificar que existe la columna foto_mes
-        if 'foto_mes' not in X_transformed.columns:
+        if 'foto_mes' not in X.columns:
             raise ValueError("El DataFrame debe contener la columna 'foto_mes'")
         
-        # Aplicar transformación a cada variable seleccionada
-        for col in self.selected_variables_:
-            if col in X_transformed.columns:
-                # Decidir el nombre de la columna de destino
-                if self.replace_original:
-                    target_col_name = col
-                else:
-                    target_col_name = f'{col}_percentile'
-                
-                
-                
-                # Aplicar la transformación agrupada por foto_mes
-                X_transformed[target_col_name] = X_transformed.groupby('foto_mes')[col].transform(
-                    calculate_percentile_with_sign
-                )
+        # Trabajar sobre el DataFrame original si replace_original=True
+        # sino crear uno nuevo solo con las columnas necesarias
+        if self.replace_original:
+            X_transformed = X.copy()
+        else:
+            X_transformed = X
         
-        return X_transformed
+        # Obtener los grupos de foto_mes una sola vez
+        foto_mes_groups = X['foto_mes'].values
+        unique_meses = np.unique(foto_mes_groups)
+        
+        # Procesar cada variable
+        for col in self.selected_variables_:
+            # Decidir el nombre de la columna de destino
+            target_col_name = col if self.replace_original else f'{col}_percentile'
+            
+            # Obtener valores de la columna
+            col_values = X[col].values
+            
+            # Inicializar array de resultados
+            result = np.empty(len(X), dtype=np.float32)
+            
+            # Procesar cada grupo de foto_mes
+            for mes in unique_meses:
+                mask = foto_mes_groups == mes
+                group_values = col_values[mask]
+                
+                # Aplicar transformación
+                result[mask] = self._calculate_percentile(group_values)
+            
+            # Asignar resultado
+            if self.replace_original:
+                X_transformed[col] = result
+            else:
+                X_transformed = X_transformed.copy() if X_transformed is X else X_transformed
+                X_transformed[target_col_name] = result
+        
+        return X_transformed    
+    def fit_transform(self, X, y=None):
+        """Ajusta y transforma en un solo paso"""
+        return self.fit(X, y).transform(X)
 
 class LagTransformer(BaseTransformer):
     """
