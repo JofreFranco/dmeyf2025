@@ -98,7 +98,6 @@ def get_features(X, training_months):
 
     X_transformed = apply_transformer(
         PercentileTransformer(
-            n_bins=None,
             replace_original=True
         ),
         X_transformed,

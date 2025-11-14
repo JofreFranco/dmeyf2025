@@ -464,22 +464,112 @@ class DeltaTransformer(BaseTransformer):
         return X_transformed
 
 class DeltaLagTransformer(BaseTransformer):
-    def __init__(self, n_deltas=2, n_lags=2, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
-        self.lag_transformer = LagTransformer(n_lags=n_lags, exclude_cols=exclude_cols)
-        self.delta_transformer = DeltaTransformer(n_deltas=n_deltas, exclude_cols=exclude_cols)
+    """
+    Calcula lags y deltas de variables de forma optimizada.
+    Para cada columna genera: col_lag1, col_lag2, col_delta1, col_delta2
+    """
+    
+    def __init__(self, n_lags=2, exclude_cols=None):
+        """
+        Parameters:
+        -----------
+        n_lags : int, default=2
+            Número de lags y deltas a calcular
+        exclude_cols : list, optional
+            Columnas a excluir del cálculo
+        """
+        self.n_lags = n_lags
+        self.exclude_cols = exclude_cols if exclude_cols is not None else [
+            "foto_mes", "numero_de_cliente", "target", "label", "weight"
+        ]
+        self.feature_columns_ = None
     
     def fit(self, X, y=None):
+        """Identifica las columnas para procesar"""
+        if not isinstance(X, pd.DataFrame):
+            raise ValueError("X debe ser un pandas DataFrame")
+        
         if "clase_ternaria" in X.columns:
             raise ValueError("La columna 'clase_ternaria' no debe estar en el dataset")
-        self.lag_transformer.fit(X)
-        self.delta_transformer.fit(X)
+        
+        # Verificar columnas requeridas
+        if 'numero_de_cliente' not in X.columns:
+            raise ValueError("El DataFrame debe contener 'numero_de_cliente'")
+        
+        # Identificar columnas a procesar
+        self.feature_columns_ = [
+            col for col in X.columns 
+            if col not in self.exclude_cols and col not in ALL_CAT_COLS
+        ]
+        
         return self
     
     def _transform(self, X):
-        X_transformed = self.lag_transformer.transform(X)
-        X_transformed = self.delta_transformer.transform(X_transformed)
+        """
+        Aplica transformación optimizada de lags y deltas.
+        """
+        if not isinstance(X, pd.DataFrame):
+            raise ValueError("X debe ser un pandas DataFrame")
+        
+        if self.feature_columns_ is None:
+            raise ValueError("El transformador no ha sido ajustado. Llame a fit() primero.")
+        
+        # Ordenar por cliente (asegura que shift funcione correctamente)
+        # Pandas groupby.shift ya maneja esto internamente, pero lo hacemos explícito
+        X_sorted = X.sort_values(['numero_de_cliente', 'foto_mes'])
+        
+        # Obtener solo las columnas a procesar
+        cols_to_process = [col for col in self.feature_columns_ if col in X_sorted.columns]
+        
+        if not cols_to_process:
+            return X
+        
+        # Crear un DataFrame con las columnas a procesar
+        data_to_shift = X_sorted[cols_to_process]
+        
+        # Agrupar una sola vez
+        grouped = X_sorted.groupby('numero_de_cliente', sort=False)
+        
+        # Diccionario para almacenar todas las nuevas columnas
+        new_cols_dict = {}
+        
+        # Calcular todos los lags de una sola vez
+        for lag in range(1, self.n_lags + 1):
+            # Shift de todas las columnas a la vez
+            lagged_data = grouped[cols_to_process].shift(lag)
+            
+            # Renombrar columnas para lags
+            lagged_data.columns = [f'{col}_lag{lag}' for col in cols_to_process]
+            
+            # Agregar al diccionario
+            for col_name in lagged_data.columns:
+                new_cols_dict[col_name] = lagged_data[col_name].values
+            
+            # Calcular deltas usando los lags recién calculados
+            # delta = valor_actual - valor_lag
+            for i, col in enumerate(cols_to_process):
+                delta_col_name = f'{col}_delta{lag}'
+                # Usar .values para operación numpy (más rápido)
+                new_cols_dict[delta_col_name] = data_to_shift[col].values - lagged_data.iloc[:, i].values
+        
+        # Crear DataFrame con todas las nuevas columnas de una sola vez
+        new_cols_df = pd.DataFrame(new_cols_dict, index=X_sorted.index)
+        
+        # Concatenar una sola vez
+        X_transformed = pd.concat([X_sorted, new_cols_df], axis=1)
+        
+        # Restaurar el orden original si es necesario
+        X_transformed = X_transformed.loc[X.index]
         
         return X_transformed
+    
+    def transform(self, X):
+        """Alias para _transform"""
+        return self._transform(X)
+    
+    def fit_transform(self, X, y=None):
+        """Ajusta y transforma en un solo paso"""
+        return self.fit(X, y).transform(X)
 
 class PeriodStatsTransformer(BaseTransformer):
     def __init__(self, periods=[12], exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
