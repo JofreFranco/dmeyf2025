@@ -111,7 +111,10 @@ def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, resul
         y_pred = model.predict(X_eval)
         rev, _ = gan_eval(y_pred, w_eval, window=2001)
         revs.append(rev)
-
+        if rev > 600000000:
+            raise Exception(f"Ganancia excesiva: {rev}")
+        if rev < 350000000:
+            raise Exception(f"Ganancia insuficiente: {rev}")
 
         write_header = not os.path.exists(results_file)
         
