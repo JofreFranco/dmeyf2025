@@ -18,6 +18,60 @@ logging.basicConfig(
     ]
 )
 
+def get_features(X, training_months):
+    X_transformed = X
+    
+    X_transformed = apply_transformer(
+        CleanZerosTransformer(),
+        X_transformed,
+        "CleanZerosTransformer",
+        logger
+    )
+    X_transformed = apply_transformer(
+        HistoricalFeaturesTransformer(),
+        X_transformed,
+        "HistoricalFeaturesTransformer",
+        logger
+    )
+    initial_cols =X_transformed.columns
+    X_transformed = apply_transformer(
+        PeriodStatsTransformer(
+            periods=[6],
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"]
+        ),
+        X_transformed,
+        "PeriodStatsTransformer",
+        logger
+    )
+    new_cols = list(set(X_transformed.columns) - set(initial_cols))
+    X_transformed = apply_transformer(
+        TendencyTransformer(
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"] + new_cols
+        ),
+        X_transformed,
+        "TendencyTransformer",
+        logger
+    )
+    new_cols = list(set(X_transformed.columns) - set(initial_cols))
+    X_transformed = apply_transformer(
+        DeltaLagTransformer(
+            n_lags=2,
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"] + new_cols
+        ),
+        X_transformed,
+        "DeltaLagTransformer",
+        logger
+    )
+    X_transformed = apply_transformer(
+        PercentileTransformer(
+            replace_original=True
+        ),
+        X_transformed,
+        "PercentileTransformer",
+        logger
+    )
+    return X_transformed
+
 # Algunos settings
 VERBOSE = False
 experiment_name = "zlgbm-histfeatures"
