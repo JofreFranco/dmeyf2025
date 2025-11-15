@@ -223,53 +223,63 @@ class PercentileTransformer(BaseTransformer):
     
     
     def _transform(self, X):
-
-        for col in self.selected_variables_:
-
-            v = X[col].values
-
+        
+        def calculate_percentile_for_group(series):
+            """
+            Calcula percentiles para un mes específico.
+            - 0 permanece como 0
+            - Positivos se rankean entre sí (0-100)
+            - Negativos se rankean usando valor absoluto y se aplica signo negativo (-100 a 0)
+            """
+            v = series.values
+            
             # Máscaras separadas
             mask_nan = np.isnan(v)
             mask_zero = (v == 0)
             mask_pos = (v > 0)
             mask_neg = (v < 0)
-
+            
             # Inicializar resultado
             result = np.zeros_like(v, dtype=np.float32)
-
+            
             # === Positivos ===
             if mask_pos.any():
                 pos_values = v[mask_pos]
-
+                
                 # rank sin nans
                 ranks = stats.rankdata(pos_values, method='min')
                 if len(pos_values) > 1:
                     percentiles = (ranks - 1) / (len(pos_values) - 1) * 100
                 else:
                     percentiles = np.array([50.0])
-
+                
                 result[mask_pos] = percentiles.astype(np.float32)
-
+            
             # === Negativos ===
             if mask_neg.any():
                 neg_values = np.abs(v[mask_neg])
-
+                
                 ranks = stats.rankdata(neg_values, method='min')
                 if len(neg_values) > 1:
                     percentiles = (ranks - 1) / (len(neg_values) - 1) * 100
                 else:
                     percentiles = np.array([50.0])
-
+                
                 result[mask_neg] = -percentiles.astype(np.float32)
-
+            
             # === Restituir ceros ===
             result[mask_zero] = 0.0
-
+            
             # === Restituir NaNs ===
             result[mask_nan] = np.nan
-
-            X[col] = result
-
+            
+            return pd.Series(result, index=series.index)
+        
+        # Procesar cada columna, agrupando por foto_mes
+        for col in self.selected_variables_:
+            # Agrupar por foto_mes y aplicar la transformación de percentiles
+            X[col] = X.groupby('foto_mes')[col].transform(calculate_percentile_for_group)
+        
         return X
     def fit_transform(self, X, y=None):
         """Ajusta y transforma en un solo paso"""
