@@ -15,9 +15,11 @@
 
 SCRIPTS=(
     "zlgbm_baseline.py"
+    "zlgbm_baseline_RF.py"
     "zlgbm_monthly.py"
     "zlgbm_historical_features.py"
-    #"zlgbm_historical_features_is_unbalanced.py"
+    "zlgmb_all_features.py"
+    "zlgbm_all_features_RF.py"
 )
 
 # ============================================================================

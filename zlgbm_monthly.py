@@ -12,10 +12,9 @@ pd.set_option('display.max_columns', None)
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
+    filename='/home/martin232009/buckets/b1/experiment.log',
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()  # Para mostrar en consola
-    ]
+    force=True
 )
 
 def get_features(X, training_months):

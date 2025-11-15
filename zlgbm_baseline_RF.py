@@ -18,10 +18,9 @@ pd.set_option('display.max_columns', None)
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
+    filename='/home/martin232009/buckets/b1/experiment.log',
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()  # Para mostrar en consola
-    ]
+    force=True
 )
 
 # Features
@@ -80,8 +79,8 @@ save_model = True
 eval_month = 202106
 test_month = 202108
 seeds = [537919, 923347, 173629, 419351, 287887, 1244, 24341, 1241, 4512, 6554, 62325, 6525235, 14, 4521, 474574, 74543, 32462, 12455, 5124, 55678]
-debug_mode = True
-sampling_rate = 0.05
+debug_mode = False
+sampling_rate = 0.1
 results_file = "/home/martin232009/buckets/b1/results.csv"
 fieldnames = ["experiment_name", "seed", "training_time", "moving_average_rev"]
 logging.info("comenzando")
