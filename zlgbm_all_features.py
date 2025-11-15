@@ -1,7 +1,6 @@
 import logging
 import gc
 import pandas as pd
-import numpy as np
 import time
 import lightgbm as lgb
 from dmeyf2025.processors.feature_processors import CleanZerosTransformer, DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer, TendencyTransformer, IntraMonthTransformer, RandomForestFeaturesTransformer, DatesTransformer, HistoricalFeaturesTransformer, AddCanaritos
@@ -27,6 +26,19 @@ def get_features(X, training_months):
         "CleanZerosTransformer",
         logger
     )
+    X_transformed = apply_transformer(
+        IntraMonthTransformer(
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"]),
+        X_transformed,
+        "IntraMonthTransformer",
+        logger
+    )
+    X_transformed = apply_transformer(
+            DatesTransformer(),
+            X_transformed,
+            "DatesTransformer",
+            logger
+        )
     X_transformed = apply_transformer(
         HistoricalFeaturesTransformer(),
         X_transformed,
@@ -74,7 +86,7 @@ def get_features(X, training_months):
 
 # Algunos settings
 VERBOSE = False
-experiment_name = "zlgbm-histfeatures"
+experiment_name = "zlgbm-allfeatures"
 training_months = [201901, 201902, 201903, 201904, 201905, 201906, 201907, 201908,
        201909, 201910, 201911, 201912, 202001, 202002, 202003, 202004,
        202005, 202006, 202007, 202008, 202009, 202010, 202011, 202012,
@@ -83,14 +95,14 @@ save_model = True
 eval_month = 202106
 test_month = 202108
 seeds = [537919, 923347, 173629, 419351, 287887, 1244, 24341, 1241, 4512, 6554, 62325, 6525235, 14, 4521, 474574, 74543, 32462, 12455, 5124, 55678]
-debug_mode = False
-sampling_rate = 0.1
+debug_mode = True
+sampling_rate = 0.05
 results_file = "/home/martin232009/buckets/b1/results.csv"
 fieldnames = ["experiment_name", "seed", "training_time", "moving_average_rev"]
 logging.info("comenzando")
 features_to_drop = ["cprestamos_prendarios", "mprestamos_prendarios", "cprestamos_personales", "mprestamos_personales"]
 canaritos = 10
-gradient_bound = 0.1
+gradient_bound = 0.01
 n_seeds = 5
 min_data_in_leaf = 20
 params = {
@@ -142,13 +154,3 @@ except:
 train_set = lgb.Dataset(X_train, label=y_train)
 revs = train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames)
 
-logger.info("Comenzando mismo experimento is_unbalance: True")
-params = {
-    "canaritos": canaritos,
-    "gradient_bound": gradient_bound,
-    "feature_fraction": 0.50,
-    "is_unbalance": True,
-}
-experiment_name = f"{experiment_name}_c{canaritos}_gb{experiment_name}_s{sampling_rate}_u{(params['is_unbalance'])}"
-
-revs = train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames)

@@ -38,7 +38,7 @@ def get_features(X, training_months):
     X_transformed = apply_transformer(
             DatesTransformer(),
             X_transformed,
-            "PeriodStats",
+            "DatesTransformer",
             logger
         )
     new_cols = list(set(X_transformed.columns) - set(initial_cols))
@@ -84,11 +84,13 @@ features_to_drop = ["cprestamos_prendarios", "mprestamos_prendarios", "cprestamo
 canaritos = 10
 gradient_bound = 0.1
 n_seeds = 5
+min_data_in_leaf = 20
 params = {
     "canaritos": canaritos,
     "gradient_bound": gradient_bound,
     "feature_fraction": 0.50,
     "is_unbalance": False,
+    "min_data_in_leaf": min_data_in_leaf,
 }
 # Leer datos
 logger.info("Leyendo dataset")
