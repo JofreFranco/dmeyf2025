@@ -24,6 +24,44 @@ logging.basicConfig(
     ]
 )
 
+# Features
+def get_features(X, training_months, VERBOSE = False):
+
+    X_transformed = X
+
+    X_transformed = apply_transformer(
+        CleanZerosTransformer(),
+        X_transformed,
+        "CleanZerosTransformer",
+        logger,
+        VERBOSE
+    )
+
+    X_transformed = apply_transformer(
+        DeltaLagTransformer(
+            n_lags=2,
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"]
+        ),
+        X_transformed,
+        "DeltaLagTransformer",
+        logger,
+        VERBOSE
+    )
+    logger.info(f"Cantidad de features después de delta lag transformer: {len(X_transformed.columns)}")
+
+    X_transformed = apply_transformer(
+        PercentileTransformer(
+            replace_original=True
+        ),
+        X_transformed,
+        "PercentileTransformer",
+        logger,
+        VERBOSE
+    )
+
+    return X_transformed
+
+
 # Algunos settings
 VERBOSE = False
 experiment_name = "zlgbm-baseline"
@@ -62,17 +100,12 @@ if debug_mode:
     
 experiment_name = f"{experiment_name}_c{canaritos}_gb{experiment_name}_s{sampling_rate}_u{(params['is_unbalance'])}"
 
-
-
-
-
 # Eliminar features que no se van a usar
 keep_cols = [col for col in df.columns if col not in features_to_drop]
 df = df[keep_cols]
 df = df[~df["foto_mes"].isna()]
 # Agregar target y calcular weight
 weight = {"BAJA+1": 1, "BAJA+2": 1.00002, "CONTINUA": 1}
-#df["target"] = ((df["clase_ternaria"] == "BAJA+2") | (df["clase_ternaria"] == "BAJA+1")).astype(int)
 
 # Preparar datos
 start_time = time.time()
@@ -80,11 +113,9 @@ logger.info("Preparando datos")
 X_train, y_train, w_train, X_eval, y_eval, w_eval, X_test, y_test = prepare_data(df, training_months, eval_month, test_month, get_features, weight, sampling_rate)
 del df
 gc.collect()
-try:
-    mem = psutil.virtual_memory()
-    logger.info(f"Sistema RAM: {mem.percent:.1f}% usado, {mem.available / (1024**3):.2f} GB disponibles, total {mem.total / (1024**3):.2f} GB")
-except Exception as e:
-    logger.warning(f"No se pudo leer estado de la RAM: {e}")
+
+print_memory_state()
+
 logger.info("Agregando canaritos")
 X_train = AddCanaritos(n_canaritos=canaritos).fit_transform(X_train)
 X_eval = AddCanaritos(n_canaritos=canaritos).fit_transform(X_eval) 
@@ -95,50 +126,10 @@ try:
     logger.info(f"Uso de memoria del dataset: {mem_gb:.2f} GB")
 except:
     logger.info("No se pudo calcular el uso de memoria del dataset")
-revs = []
+
 train_set = lgb.Dataset(X_train, label=y_train)
-for seed in seeds[:n_seeds]:
-    params["seed"] = seed
-    start_time = time.time()
-    logger.info(f"Entrenando modelo con seed: {seed}")
-    model = train_model(train_set, params)
-    try:
-        y_pred = model.predict(X_eval)
-        rev, _ = gan_eval(y_pred, w_eval, window=2001)
-        revs.append(rev)
-    except Exception as e:
-        logger.info(y_pred.shape)
-        logger.info(y_pred)
-        logger.info(f"time: {time.time()- start_time}")
-        logger.error(f"Error al predecir: {e}")
-        raise e
+revs = train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames)
 
-    write_header = not os.path.exists(results_file)
-    
-    if save_model:
-        joblib.dump(model, f"/home/martin232009/buckets/b1/models/{experiment_name}_{seed}.pkl")
-        save_model = False
-    end_time = time.time()
-    result_row = {
-        "experiment_name": experiment_name,
-        "seed": seed,
-        "training_time": end_time - start_time,
-        "moving_average_rev": rev
-    }
-    with open(results_file, "a", newline="") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        if write_header:
-            writer.writeheader()
-        writer.writerow(result_row)
-    gc.collect()
-    logger.info(f"Modelo entrenado en tiempo: {end_time - start_time}")
-    logger.info(f"Ganancia: {rev}")
 
-logger.info(f"Ganancias: {revs}")
-logger.info(f"Ganancia promedio: {np.mean(revs)}")
-logger.info(f"Ganancia máxima: {np.max(revs)}")
-logger.info(f"Ganancia mínima: {np.min(revs)}")
-logger.info(f"Ganancia std: {np.std(revs)}")
-logger.info(f"Ganancia mediana: {np.median(revs)}")
 # Eliminar features con canaritos
 # TODO: Implementar

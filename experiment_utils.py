@@ -1,17 +1,15 @@
 import logging
+import gc
+import pandas as pd
+import time
+import lightgbm as lgb
+import psutil
 import os
 import csv
 import joblib
-import psutil
-import gc
-import pandas as pd
 import numpy as np
-import time
-import lightgbm as lgb
-from dmeyf2025.processors.feature_processors import CleanZerosTransformer, DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer, TendencyTransformer, IntraMonthTransformer, RandomForestFeaturesTransformer, DatesTransformer, HistoricalFeaturesTransformer, AddCanaritos
-
 from dmeyf2025.metrics.revenue import gan_eval
-from dmeyf2025.etl.etl import prepare_data
+
 pd.set_option('display.max_columns', None)
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -51,45 +49,9 @@ def apply_transformer(transformer, X, name: str, logger, VERBOSE=False):
     gc.collect()
     return Xt
 
-
-def get_features(X, training_months):
-
-    X_transformed = X
-
-    X_transformed = apply_transformer(
-        CleanZerosTransformer(),
-        X_transformed,
-        "CleanZerosTransformer",
-        logger
-    )
-
-    X_transformed = apply_transformer(
-        DeltaLagTransformer(
-            n_lags=2,
-            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"]
-        ),
-        X_transformed,
-        "DeltaLagTransformer",
-        logger
-    )
-    logger.info(f"Cantidad de features después de delta lag transformer: {len(X_transformed.columns)}")
-
-    X_transformed = apply_transformer(
-        PercentileTransformer(
-            replace_original=True
-        ),
-        X_transformed,
-        "PercentileTransformer",
-        logger
-    )
-
-    return X_transformed
-
-
-
 def train_model(train_set, params):
     """
-    Entrena un modelo ZuperLightGBM (lgbm)
+    Entrena un modelo Z(uper)LightGBM (lgbm)
     Args:
         X_train (pd.DataFrame): Features de entrenamiento
         y_train (pd.Series): Variable objetivo de entrenamiento
@@ -132,3 +94,49 @@ def train_model(train_set, params):
         train_set
     )
     return gbm
+
+def print_memory_state():
+    try:
+        mem = psutil.virtual_memory()
+        logger.info(f"Sistema RAM: {mem.percent:.1f}% usado, {mem.available / (1024**3):.2f} GB disponibles, total {mem.total / (1024**3):.2f} GB")
+    except Exception as e:
+        logger.warning(f"No se pudo leer estado de la RAM: {e}")
+def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames):
+    revs = []
+    for seed in seeds[:n_seeds]:
+        params["seed"] = seed
+        start_time = time.time()
+        logger.info(f"Entrenando modelo con seed: {seed}")
+        model = train_model(train_set, params)
+        y_pred = model.predict(X_eval)
+        rev, _ = gan_eval(y_pred, w_eval, window=2001)
+        revs.append(rev)
+
+
+        write_header = not os.path.exists(results_file)
+        
+        if save_model:
+            joblib.dump(model, f"/home/martin232009/buckets/b1/models/{experiment_name}_{seed}.pkl")
+            save_model = False
+        end_time = time.time()
+        result_row = {
+            "experiment_name": experiment_name,
+            "seed": seed,
+            "training_time": end_time - start_time,
+            "moving_average_rev": rev
+        }
+        with open(results_file, "a", newline="") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            if write_header:
+                writer.writeheader()
+            writer.writerow(result_row)
+        gc.collect()
+        logger.info(f"Modelo entrenado en tiempo: {end_time - start_time}")
+        logger.info(f"Ganancia: {rev}")
+    logger.info(f"Ganancias: {revs}")
+    logger.info(f"Ganancia promedio: {np.mean(revs)}")
+    logger.info(f"Ganancia máxima: {np.max(revs)}")
+    logger.info(f"Ganancia mínima: {np.min(revs)}")
+    logger.info(f"Ganancia std: {np.std(revs)}")
+    logger.info(f"Ganancia mediana: {np.median(revs)}")
+    return revs
