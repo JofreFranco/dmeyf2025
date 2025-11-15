@@ -422,7 +422,7 @@ class DeltaTransformer(BaseTransformer):
         pd.DataFrame
             DataFrame con las nuevas columnas de deltas
         """
-        if not isinstance(X, pd.DataFrame):
+        if not isinstance(X_transformed, pd.DataFrame):
             raise ValueError("X debe ser un pandas DataFrame")
 
         
