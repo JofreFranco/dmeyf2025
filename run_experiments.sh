@@ -17,7 +17,7 @@ SCRIPTS=(
     "zlgbm_baseline.py"
     "zlgbm_monthly.py"
     "zlgbm_historical_features.py"
-    "zlgbm_historical_features_is_unbalanced.py"
+    #"zlgbm_historical_features_is_unbalanced.py"
 )
 
 # ============================================================================
@@ -142,16 +142,5 @@ log_message "Presiona Ctrl+C para cancelar el apagado."
 sleep 10
 
 log_message "Ejecutando apagado del sistema..."
-
-# Detectar el sistema operativo y usar el comando apropiado
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
-    sudo shutdown -h now
-elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    # Linux
-    sudo shutdown -h now
-else
-    log_message "WARNING: Sistema operativo no reconocido. No se pudo apagar automáticamente."
-    log_message "Por favor, apague el sistema manualmente."
-fi
+sudo shutdown -h now
 
