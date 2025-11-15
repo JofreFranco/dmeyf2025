@@ -55,8 +55,7 @@ class SamplerProcessor(BaseEstimator, TransformerMixin):
 
         # Construimos un DataFrame que incluye y para facilitar muestreo conjunto
         df_sampled = X
-        df_sampled['label'] = y
-        df_sampled = df_sampled.copy() # consolidar dataframe para evitar warnings de pandas
+        df_sampled.loc[:, 'label'] = y
         del X, y
         gc.collect()
 

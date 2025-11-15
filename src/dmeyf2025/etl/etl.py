@@ -186,7 +186,7 @@ def prepare_data(df, training_months, eval_month, test_month, get_features, weig
     if training_months is not None:
         df_train = df_transformed[df_transformed["foto_mes"].isin(training_months)]
     else:
-        df_train = df_transformed[~df_transformed["foto_mes"].isin([eval_month, test_month])]
+        df_train = df_transformed[~df_transformed["foto_mes"] < eval_month]
     df_eval = df_transformed[df_transformed["foto_mes"] == eval_month]
     df_test = df_transformed[df_transformed["foto_mes"] == test_month]
     del df_transformed
@@ -203,6 +203,28 @@ def prepare_data(df, training_months, eval_month, test_month, get_features, weig
     gc.collect()
     w_train = X_train["weight"]
     X_train = X_train.drop(columns=["weight"])
+    if "label" in X_train.columns:
+        X_train = X_train.drop(columns=["label"])
+    if "weight" in X_train.columns:
+        X_train = X_train.drop(columns=["weight"])
+    if "clase_ternaria" in X_train.columns:
+        X_train = X_train.drop(columns=["clase_ternaria"])
+
+
+    if "label" in X_test.columns:
+        X_test = X_test.drop(columns=["label"])
+    if "weight" in X_test.columns:
+        X_test = X_test.drop(columns=["weight"])
+    if "clase_ternaria" in X_test.columns:
+        X_test = X_test.drop(columns=["clase_ternaria"])
+
+    if "label" in X_eval.columns:
+        X_eval = X_eval.drop(columns=["label"])
+    if "weight" in X_eval.columns:
+        X_eval = X_eval.drop(columns=["weight"])
+    if "clase_ternaria" in X_eval.columns:
+        X_eval = X_eval.drop(columns=["clase_ternaria"])
+        
     return X_train, y_train, w_train, X_eval, y_eval, w_eval, X_test, y_test
 if __name__ == "__main__":
     pass

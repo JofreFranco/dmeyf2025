@@ -84,25 +84,40 @@ def apply_transformer(transformer, X, name: str, logger):
 def get_features(X, training_months):
 
     X_transformed = X
-
+    initial_cols =X_transformed.columns
     X_transformed = apply_transformer(
         CleanZerosTransformer(),
         X_transformed,
         "CleanZerosTransformer",
         logger
     )
-
+    new_cols = list(set(X_transformed.columns) - set(initial_cols))
     X_transformed = apply_transformer(
         DeltaLagTransformer(
             n_lags=2,
-            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"]
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"] + new_cols
         ),
         X_transformed,
         "DeltaLagTransformer",
         logger
     )
-    logger.info(f"Cantidad de features después de delta lag transformer: {len(X_transformed.columns)}")
 
+    X_transformed = apply_transformer(
+        PeriodStatsTransformer(
+            periods=[6]
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"] + new_cols
+        ),
+        X_transformed,
+        "PeriodStats",
+        logger
+    )
+        
+    X_transformed = apply_transformer(
+        TendencyTransformer(),
+        X_transformed,
+        "PeriodStats",
+        logger
+    )
     X_transformed = apply_transformer(
         PercentileTransformer(
             replace_original=True
@@ -112,6 +127,7 @@ def get_features(X, training_months):
         logger
     )
 
+    
     return X_transformed
 
 

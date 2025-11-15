@@ -1,4 +1,5 @@
 import pandas as pd
+from scipy import stats
 import numpy as np
 import lightgbm as lgb
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -99,13 +100,12 @@ class CleanZerosTransformer(BaseTransformer):
 
         # Limpiar variables rotas del 202006
         #detectar todas las columnas que son SOLO 0 en el 202006
-        zero_cols = X_transformed[X_transformed["foto_mes"] == 202006].columns[X_transformed[X_transformed["foto_mes"] == 202006].apply(lambda x: x.nunique()) == 1]
+        zero_cols = X_transformed[X_transformed["foto_mes"] == 202006].columns[X_transformed[X_transformed["foto_mes"] == 202006].apply(lambda x: x.nunique()) == 1].drop("foto_mes")
+        
         X_transformed.loc[X_transformed["foto_mes"] == 202006, zero_cols] = np.nan        
         return X_transformed
 
-import numpy as np
-import pandas as pd
-from scipy import stats
+
 
 class PercentileTransformer(BaseTransformer):
     """
@@ -115,7 +115,7 @@ class PercentileTransformer(BaseTransformer):
     - Los valores negativos se transforman usando el valor absoluto y luego se aplica el signo negativo
     """
     
-    def __init__(self, variables=None, exclude_cols=None, replace_original=False):
+    def __init__(self, variables=None, exclude_cols=None, replace_original=True):
         """
         Aplica la transformación de percentiles continuos.
         Para cada mes y cada variable:
@@ -164,11 +164,7 @@ class PercentileTransformer(BaseTransformer):
         if self.variables is None:
             self.selected_variables_ = [
                 col for col in X.columns 
-                if col not in self.exclude_cols 
-                and col not in ALL_CAT_COLS
-                and col.startswith('m')
-                and pd.api.types.is_numeric_dtype(X[col])
-            ]
+                if col not in self.exclude_cols]
         else:
             # Verificar que todas las variables existen
             missing_cols = set(self.variables) - set(X.columns)
@@ -181,8 +177,6 @@ class PercentileTransformer(BaseTransformer):
     def _calculate_percentile(self, values):
         """
         Calcula percentiles continuos con manejo de ceros y negativos.
-        Optimizado para velocidad y memoria.
-        
         Parameters:
         -----------
         values : np.ndarray
@@ -198,23 +192,15 @@ class PercentileTransformer(BaseTransformer):
             return np.array([], dtype=np.float32)
         
         # Inicializar resultado con ceros
-        result = np.zeros(n, dtype=np.float32)
-        
-        # Identificar ceros (ya están en 0, no hacer nada)
-        non_zero_mask = values != 0
-        
-        if not non_zero_mask.any():
-            return result
-        
-        # Separar positivos y negativos
+        result = np.zeros(n, dtype=np.float32)        
+        # Separar positivos y negativos, los 0 quedan como estan
         pos_mask = values > 0
         neg_mask = values < 0
         
         # Procesar valores positivos
         if pos_mask.any():
             pos_values = values[pos_mask]
-            # Usar rankdata de scipy (más rápido que pandas)
-            pos_ranks = stats.rankdata(pos_values, method='average')
+            pos_ranks = stats.rankdata(pos_values, method='min')
             # Calcular percentiles (0-100)
             if len(pos_values) > 1:
                 pos_percentiles = (pos_ranks - 1) / (len(pos_values) - 1) * 100
@@ -222,10 +208,10 @@ class PercentileTransformer(BaseTransformer):
                 pos_percentiles = np.array([50.0])
             result[pos_mask] = pos_percentiles.astype(np.float32)
         
-        # Procesar valores negativos (rankear por valor absoluto)
+        # Procesar valores negativos
         if neg_mask.any():
             neg_values = np.abs(values[neg_mask])
-            neg_ranks = stats.rankdata(neg_values, method='average')
+            neg_ranks = stats.rankdata(neg_values, method='min')
             # Calcular percentiles y aplicar signo negativo
             if len(neg_values) > 1:
                 neg_percentiles = (neg_ranks - 1) / (len(neg_values) - 1) * 100
@@ -235,68 +221,56 @@ class PercentileTransformer(BaseTransformer):
         
         return result
     
+    
     def _transform(self, X):
-        """
-        Aplica la transformación de percentiles.
-        
-        Parameters:
-        -----------
-        X : pd.DataFrame
-            DataFrame de entrada
-            
-        Returns:
-        --------
-        pd.DataFrame
-            DataFrame transformado
-        """
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-        
-        if self.selected_variables_ is None:
-            raise ValueError("El transformador no ha sido ajustado. Llame a fit() primero.")
-        
-        # Verificar que existe la columna foto_mes
-        if 'foto_mes' not in X.columns:
-            raise ValueError("El DataFrame debe contener la columna 'foto_mes'")
-        
-        # Trabajar sobre el DataFrame original si replace_original=True
-        # sino crear uno nuevo solo con las columnas necesarias
-        if self.replace_original:
-            X_transformed = X.copy()
-        else:
-            X_transformed = X
-        
-        # Obtener los grupos de foto_mes una sola vez
-        foto_mes_groups = X['foto_mes'].values
-        unique_meses = np.unique(foto_mes_groups)
-        
-        # Procesar cada variable
+
         for col in self.selected_variables_:
-            # Decidir el nombre de la columna de destino
-            target_col_name = col if self.replace_original else f'{col}_percentile'
-            
-            # Obtener valores de la columna
-            col_values = X[col].values
-            
-            # Inicializar array de resultados
-            result = np.empty(len(X), dtype=np.float32)
-            
-            # Procesar cada grupo de foto_mes
-            for mes in unique_meses:
-                mask = foto_mes_groups == mes
-                group_values = col_values[mask]
-                
-                # Aplicar transformación
-                result[mask] = self._calculate_percentile(group_values)
-            
-            # Asignar resultado
-            if self.replace_original:
-                X_transformed[col] = result
-            else:
-                X_transformed = X_transformed.copy() if X_transformed is X else X_transformed
-                X_transformed[target_col_name] = result
-        
-        return X_transformed    
+
+            v = X[col].values
+
+            # Máscaras separadas
+            mask_nan = np.isnan(v)
+            mask_zero = (v == 0)
+            mask_pos = (v > 0)
+            mask_neg = (v < 0)
+
+            # Inicializar resultado
+            result = np.zeros_like(v, dtype=np.float32)
+
+            # === Positivos ===
+            if mask_pos.any():
+                pos_values = v[mask_pos]
+
+                # rank sin nans
+                ranks = stats.rankdata(pos_values, method='min')
+                if len(pos_values) > 1:
+                    percentiles = (ranks - 1) / (len(pos_values) - 1) * 100
+                else:
+                    percentiles = np.array([50.0])
+
+                result[mask_pos] = percentiles.astype(np.float32)
+
+            # === Negativos ===
+            if mask_neg.any():
+                neg_values = np.abs(v[mask_neg])
+
+                ranks = stats.rankdata(neg_values, method='min')
+                if len(neg_values) > 1:
+                    percentiles = (ranks - 1) / (len(neg_values) - 1) * 100
+                else:
+                    percentiles = np.array([50.0])
+
+                result[mask_neg] = -percentiles.astype(np.float32)
+
+            # === Restituir ceros ===
+            result[mask_zero] = 0.0
+
+            # === Restituir NaNs ===
+            result[mask_nan] = np.nan
+
+            X[col] = result
+
+        return X
     def fit_transform(self, X, y=None):
         """Ajusta y transforma en un solo paso"""
         return self.fit(X, y).transform(X)
@@ -424,7 +398,7 @@ class DeltaTransformer(BaseTransformer):
         
         return self
     
-    def _transform(self, X):
+    def _transform(self, X_transformed):
         """
         Aplica la transformación de deltas.
         
@@ -440,8 +414,7 @@ class DeltaTransformer(BaseTransformer):
         """
         if not isinstance(X, pd.DataFrame):
             raise ValueError("X debe ser un pandas DataFrame")
-            
-        X_transformed = X
+
         
         # Preparar lista de nuevas columnas para concatenar
         new_columns = []
@@ -452,10 +425,13 @@ class DeltaTransformer(BaseTransformer):
                 if col in X_transformed.columns:
                     # Calcular delta agrupado por cliente
                     delta_col_name = f'{col}_delta{delta}'
+                    lag_col_name = f"'{col}lag{delta}'"
                     lagged_col = X_transformed.groupby('numero_de_cliente')[col].shift(delta)
+                    lagged_col.name = lag_col_name
                     delta_series = X_transformed[col] - lagged_col
                     delta_series.name = delta_col_name
                     new_columns.append(delta_series)
+                    new_columns.append(lagged_col)
         
         # Concatenar todas las nuevas columnas de una sola vez
         if new_columns:
@@ -572,7 +548,7 @@ class DeltaLagTransformer(BaseTransformer):
         return self.fit(X, y).transform(X)
 
 class PeriodStatsTransformer(BaseTransformer):
-    def __init__(self, periods=[12], exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
+    def __init__(self, periods=[6], exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         self.periods = periods
         self.exclude_cols = exclude_cols
     
@@ -593,7 +569,7 @@ class PeriodStatsTransformer(BaseTransformer):
         for period in self.periods:
             rolling_stats = shifted_data.rolling(window=period, min_periods=1)
             
-            for stat_name, stat_func in [('min', 'min'), ('max', 'max'), ('mean', 'mean'), ('median', 'median')]:
+            for stat_name, stat_func in [('min', 'min'), ('max', 'max'), ('mean', 'mean'), ('std', 'std')]:
                 stats_data = getattr(rolling_stats, stat_func)()
                 for col in numeric_cols:
                     new_col_name = f'{col}_period{period}_{stat_name}'
