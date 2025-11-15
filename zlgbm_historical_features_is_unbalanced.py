@@ -47,15 +47,13 @@ params = {
     "gradient_bound": gradient_bound,
     "feature_fraction": 0.50,
     "min_data_in_leaf": 20,
-    "is_unbalance": False,
+    "is_unbalance": True,
 }
-
 if debug_mode:
     n_seeds = 1
     sampling_rate = 0.01
     params["min_data_in_leaf"] = 2000
     params["gradient_bound"] = 0.4
-
 experiment_name = f"{experiment_name}_c{canaritos}_gb{experiment_name}_s{sampling_rate}_u{(params['is_unbalance'])}"
 def memory_gb(df: pd.DataFrame) -> float:
     return df.memory_usage().sum() / (1024 ** 3)

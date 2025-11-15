@@ -49,13 +49,11 @@ params = {
     "min_data_in_leaf": 20,
     "is_unbalance": False,
 }
-
 if debug_mode:
     n_seeds = 1
     sampling_rate = 0.01
     params["min_data_in_leaf"] = 2000
     params["gradient_bound"] = 0.4
-
 experiment_name = f"{experiment_name}_c{canaritos}_gb{experiment_name}_s{sampling_rate}_u{(params['is_unbalance'])}"
 def memory_gb(df: pd.DataFrame) -> float:
     return df.memory_usage().sum() / (1024 ** 3)
@@ -98,6 +96,19 @@ def get_features(X, training_months):
         "CleanZerosTransformer",
         logger
     )
+    X_transformed = apply_transformer(
+        IntraMonthTransformer(
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"]),
+        X_transformed,
+        "IntraMonthTransformer",
+        logger
+    )
+    X_transformed = apply_transformer(
+            DatesTransformer(),
+            X_transformed,
+            "PeriodStats",
+            logger
+        )
     new_cols = list(set(X_transformed.columns) - set(initial_cols))
     X_transformed = apply_transformer(
         DeltaLagTransformer(
@@ -109,21 +120,6 @@ def get_features(X, training_months):
         logger
     )
 
-    X_transformed = apply_transformer(
-        PeriodStatsTransformer(
-            periods=[6],
-            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"] + new_cols),
-        X_transformed,
-        "PeriodStats",
-        logger
-    )
-        
-    X_transformed = apply_transformer(
-        TendencyTransformer(),
-        X_transformed,
-        "PeriodStats",
-        logger
-    )
     X_transformed = apply_transformer(
         PercentileTransformer(
             replace_original=True
