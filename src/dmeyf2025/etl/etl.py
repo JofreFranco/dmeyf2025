@@ -209,7 +209,8 @@ def prepare_data(df, training_months, eval_month, test_month, get_features, weig
         X_train = X_train.drop(columns=["weight"])
     if "clase_ternaria" in X_train.columns:
         X_train = X_train.drop(columns=["clase_ternaria"])
-
+    if "numero_cliente" in X_train.columns
+        X_train = X_train.drop(columns=["numero_cliente"])
 
     if "label" in X_test.columns:
         X_test = X_test.drop(columns=["label"])
@@ -217,13 +218,16 @@ def prepare_data(df, training_months, eval_month, test_month, get_features, weig
         X_test = X_test.drop(columns=["weight"])
     if "clase_ternaria" in X_test.columns:
         X_test = X_test.drop(columns=["clase_ternaria"])
-
+    if "numero_cliente" in X_test.columns
+        X_test = X_test.drop(columns=["numero_cliente"])
     if "label" in X_eval.columns:
         X_eval = X_eval.drop(columns=["label"])
     if "weight" in X_eval.columns:
         X_eval = X_eval.drop(columns=["weight"])
     if "clase_ternaria" in X_eval.columns:
         X_eval = X_eval.drop(columns=["clase_ternaria"])
+    if "numero_cliente" in X_eval.columns
+        X_eval = X_eval.drop(columns=["numero_cliente"])
         
     return X_train, y_train, w_train, X_eval, y_eval, w_eval, X_test, y_test
 if __name__ == "__main__":
