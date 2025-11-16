@@ -120,6 +120,17 @@ gc.collect()
 
 print_memory_state()
 
+logger.info("Identificando features de baja importancia")
+low_importance_features = identify_low_importance_features(X_train, y_train, 20, save=True, output_file='low_importance_features.csv')
+logger.info(f"Features de baja importancia: {low_importance_features}")
+
+x_train_columns = [col for col in X_train.columns if col not in low_importance_features]
+x_eval_columns = [col for col in X_eval.columns if col not in low_importance_features]
+x_test_columns = [col for col in X_test.columns if col not in low_importance_features]
+X_train = X_train[x_train_columns]
+X_eval = X_eval[x_eval_columns]
+X_test = X_test[x_test_columns]
+
 logger.info("Agregando canaritos")
 X_train = AddCanaritos(n_canaritos=canaritos).fit_transform(X_train)
 X_eval = AddCanaritos(n_canaritos=canaritos).fit_transform(X_eval) 

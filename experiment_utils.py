@@ -9,6 +9,7 @@ import csv
 import joblib
 import numpy as np
 from dmeyf2025.metrics.revenue import gan_eval
+from dmeyf2025.processors.feature_processors import AddCanaritos
 
 pd.set_option('display.max_columns', None)
 logger = logging.getLogger(__name__)
@@ -143,3 +144,159 @@ def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, resul
     logger.info(f"Ganancia std: {np.std(revs)}")
     logger.info(f"Ganancia mediana: {np.median(revs)}")
     return revs
+
+def identify_low_importance_features(
+    X_train, 
+    y_train, 
+    n_canaritos=10,
+    params=None,
+    save=False,
+    output_file='low_importance_features.csv'
+):
+    """
+    Identifica variables con menor importancia que el promedio de los canaritos.
+    
+    Esta función agrega canaritos (variables aleatorias) al dataset, entrena un modelo
+    LightGBM, y identifica todas las variables cuya importancia es menor que el promedio
+    de importancia de los canaritos.
+    Parameters:
+    -----------
+    
+    """
+    
+    logger.info("="*80)
+    logger.info("🔍 Identificando variables de baja importancia usando canaritos")
+    logger.info("="*80)
+    
+    # Parámetros por defecto si no se proveen
+    if params is None:
+        params = {
+            'seed': 42,
+            'min_data_in_leaf': 2000,
+            'feature_fraction': 0.5,
+            'canaritos': 0,  # No matar árboles por canaritos en este análisis
+            'gradient_bound': 0.2
+        }
+        logger.info("Usando parámetros por defecto")
+    
+    logger.info(f"Parámetros del modelo: {params}")
+    
+    # Paso 1: Agregar canaritos
+    logger.info(f"\n📊 Agregando {n_canaritos} canaritos al dataset...")
+    canaritos_transformer = AddCanaritos(n_canaritos=n_canaritos)
+    
+    # Identificar columnas que no son features (para preservarlas)
+    exclude_cols = ['foto_mes', 'numero_de_cliente', 'target', 'label', 'weight', 'clase_ternaria']
+    feature_cols = [col for col in X_train.columns if col not in exclude_cols]
+    
+    logger.info(f"Features originales: {len(feature_cols)}")
+    
+    # Aplicar transformación de canaritos
+    X_train_with_canaritos = canaritos_transformer.fit_transform(X_train)
+    
+    # Identificar los nombres de los canaritos
+    canaritos_names = [col for col in X_train_with_canaritos.columns if col.startswith('canarito_')]
+    logger.info(f"Canaritos agregados: {canaritos_names}")
+    
+    # Separar features para entrenar (sin columnas de identificación)
+    X_train_features = X_train_with_canaritos[[col for col in X_train_with_canaritos.columns if col not in exclude_cols]]
+    
+    logger.info(f"Total de features para entrenar (incluyendo canaritos): {len(X_train_features.columns)}")
+    
+    # Paso 2: Crear dataset de LightGBM
+    logger.info("\n🏋️ Creando dataset de LightGBM...")
+    train_set = lgb.Dataset(
+        data=X_train_features,
+        label=y_train,
+        free_raw_data=False
+    )
+    
+    # Paso 3: Entrenar modelo
+    logger.info("\n🚀 Entrenando modelo LightGBM...")
+    start_time = time.time()
+    model = train_model(train_set, params)
+    training_time = time.time() - start_time
+    logger.info(f"✅ Modelo entrenado en {training_time:.2f} segundos")
+    logger.info(f"Número de árboles: {model.num_trees()}")
+    
+    # Paso 4: Obtener importancia de features
+    logger.info("\n📈 Calculando importancia de features...")
+    feature_names = model.feature_name()
+    feature_importance = model.feature_importance(importance_type='gain')
+    
+    # Crear DataFrame con importancias
+    importance_df = pd.DataFrame({
+        'feature': feature_names,
+        'importance': feature_importance
+    })
+    
+    # Separar canaritos de features reales
+    importance_df['is_canarito'] = importance_df['feature'].str.startswith('canarito_')
+    
+    # Calcular estadísticas de canaritos
+    canaritos_importance = importance_df[importance_df['is_canarito']]['importance']
+    canaritos_avg = canaritos_importance.mean()
+    canaritos_median = canaritos_importance.median()
+    canaritos_max = canaritos_importance.max()
+    canaritos_min = canaritos_importance.min()
+    
+    logger.info(f"\n📊 Estadísticas de importancia de canaritos:")
+    logger.info(f"  - Promedio: {canaritos_avg:.6f}")
+    logger.info(f"  - Mediana: {canaritos_median:.6f}")
+    logger.info(f"  - Máximo: {canaritos_max:.6f}")
+    logger.info(f"  - Mínimo: {canaritos_min:.6f}")
+    
+    # Identificar features con menor importancia que el promedio de canaritos
+    low_importance_mask = (importance_df['importance'] < canaritos_avg) & (~importance_df['is_canarito'])
+    low_importance_features = importance_df[low_importance_mask]['feature'].tolist()
+    
+    logger.info(f"\n🎯 Variables con importancia menor al promedio de canaritos: {len(low_importance_features)}")
+    
+    # Ordenar por importancia
+    importance_df_sorted = importance_df.sort_values('importance', ascending=True)
+    
+    # Mostrar algunas variables de baja importancia
+    if len(low_importance_features) > 0:
+        logger.info(f"\n📉 Top 10 variables de menor importancia:")
+        low_importance_df = importance_df_sorted[importance_df_sorted['feature'].isin(low_importance_features)]
+        low_importance_top10 = low_importance_df.head(10)
+        for idx, row in low_importance_top10.iterrows():
+            logger.info(f"  - {row['feature']}: {row['importance']:.6f}")
+    else:
+        logger.info("✅ Todas las variables tienen importancia mayor al promedio de canaritos")
+    
+    # Paso 5: Guardar resultados si se solicita
+    if save:
+        logger.info(f"\n💾 Guardando resultados en {output_file}...")
+        
+        # Preparar DataFrame para guardar
+        save_df = importance_df_sorted[['feature', 'importance', 'is_canarito']].copy()
+        save_df['below_canarito_avg'] = save_df['importance'] < canaritos_avg
+        save_df['canaritos_avg_importance'] = canaritos_avg
+        
+        # Guardar
+        save_df.to_csv(output_file, index=False)
+        logger.info(f"✅ Resultados guardados en {output_file}")
+    
+    # Resumen final
+    logger.info("\n" + "="*80)
+    logger.info("📋 RESUMEN")
+    logger.info("="*80)
+    logger.info(f"Total de features originales: {len(feature_cols)}")
+    logger.info(f"Número de canaritos: {n_canaritos}")
+    logger.info(f"Promedio importancia canaritos: {canaritos_avg:.6f}")
+    logger.info(f"Variables de baja importancia detectadas: {len(low_importance_features)}")
+    logger.info(f"Porcentaje de features de baja importancia: {100 * len(low_importance_features) / len(feature_cols):.2f}%")
+    logger.info("="*80)
+    
+    # Limpiar memoria
+    gc.collect()
+    
+    # Retornar resultados
+    return {
+        'low_importance_features': low_importance_features,
+        'canaritos_avg_importance': canaritos_avg,
+        'feature_importance_df': importance_df_sorted[['feature', 'importance', 'is_canarito']].copy(),
+        'n_low_importance': len(low_importance_features),
+        'n_total_features': len(feature_cols)
+    }
