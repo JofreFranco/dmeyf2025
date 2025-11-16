@@ -662,9 +662,10 @@ class TendencyTransformer(BaseTransformer):
     """
     Calcula la pendiente de regresión lineal de cada variable numérica para cada cliente usando una ventana de 6 meses.
     """
-    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
+    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"], window=6):
         self.exclude_cols = exclude_cols
         self.numeric_cols_ = None
+        self.window = window
 
     def fit(self, X, y=None):
         if not isinstance(X, pd.DataFrame):
@@ -694,28 +695,36 @@ class TendencyTransformer(BaseTransformer):
             for s, n in zip(start_idx, counts):
                 y = y_all[s : s + n]
                 mask = np.isfinite(y)
-                if mask.sum() < 2:
-                    continue
-
-                y = np.where(mask, y, 0.0)  # reemplazo NaN temporal
-                x = np.arange(n, dtype=float)
-
-                # acumulativas
-                n_valid = np.cumsum(mask)
-                sum_x = np.cumsum(x * mask)
-                sum_y = np.cumsum(y)
-                sum_xy = np.cumsum(x * y)
-                sum_x2 = np.cumsum(x * x)
-
-                # fórmula de la pendiente
-                num = n_valid * sum_xy - sum_x * sum_y
-                den = n_valid * sum_x2 - sum_x * sum_x
-                with np.errstate(divide='ignore', invalid='ignore'):
-                    slope_block = np.where(den != 0, num / den, np.nan)
-
-                # aplicar máscara: pendiente solo donde hay >=2 datos válidos
-                slope_block[n_valid < 2] = np.nan
-                slope[s : s + n] = slope_block
+                
+                # Para cada posición, calcular la pendiente con los últimos window meses
+                for i in range(n):
+                    # Determinar la ventana: últimos window meses (incluyendo el actual)
+                    start_window = max(0, i - self.window + 1)
+                    end_window = i + 1
+                    
+                    # Extraer datos de la ventana
+                    y_window = y[start_window:end_window]
+                    mask_window = mask[start_window:end_window]
+                    
+                    # Verificar que hay al menos 2 datos válidos
+                    if mask_window.sum() < 2:
+                        continue
+                    
+                    # Filtrar solo valores válidos
+                    y_valid = y_window[mask_window]
+                    x_valid = np.arange(len(y_window))[mask_window].astype(float)
+                    
+                    # Calcular pendiente con fórmula de mínimos cuadrados
+                    n_valid = len(x_valid)
+                    sum_x = x_valid.sum()
+                    sum_y = y_valid.sum()
+                    sum_xy = (x_valid * y_valid).sum()
+                    sum_x2 = (x_valid * x_valid).sum()
+                    
+                    den = n_valid * sum_x2 - sum_x * sum_x
+                    if den != 0:
+                        num = n_valid * sum_xy - sum_x * sum_y
+                        slope[s + i] = num / den
 
             new_cols[f"{col}_tendency"] = slope
 
