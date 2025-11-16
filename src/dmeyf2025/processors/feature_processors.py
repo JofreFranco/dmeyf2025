@@ -5,6 +5,7 @@ import lightgbm as lgb
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OneHotEncoder
 from flaml.default import preprocess_and_suggest_hyperparams
+from joblib import Parallel, delayed
 
 from ..utils.data_dict import ALL_CAT_COLS, EXCLUDE_COLS
 
@@ -35,12 +36,119 @@ def calculate_percentile_with_sign(group, n_bins=None):
 class BaseTransformer(BaseEstimator, TransformerMixin):
     def fit(self, X, y=None):
         return self
-    def transform(self, X):
-
-        if "clase_ternaria" in X.columns:
-            raise ValueError("La columna 'clase_ternaria' no debe estar en el dataset")
-        X_transformed = self._transform(X)
+    
+    def transform(self, X, parallel=False, parallelize_by='foto_mes', n_jobs=-1):
+        """
+        Transforma el DataFrame X aplicando la transformación definida en _transform.
+        
+        Parameters:
+        -----------
+        X : pd.DataFrame
+            DataFrame de entrada
+        parallel : bool, default=False
+            Si True, paraleliza el procesamiento
+        parallelize_by : str, default='foto_mes'
+            Estrategia de paralelización:
+            - 'foto_mes': Divide por foto_mes y procesa cada mes en paralelo
+            - 'numero_cliente': Divide por último dígito del numero_de_cliente (0-9) y procesa en paralelo
+            - 'column': Procesa cada columna en paralelo (solo para transformers que procesan columnas independientemente)
+        n_jobs : int, default=-1
+            Número de trabajos paralelos. -1 usa todos los cores disponibles
+            
+        Returns:
+        --------
+        pd.DataFrame
+            DataFrame transformado
+        """
+        if not parallel:
+            # Comportamiento normal sin paralelización
+            return self._transform(X.copy())
+        
+        if parallelize_by == 'foto_mes':
+            return self._transform_parallel_by_foto_mes(X, n_jobs)
+        elif parallelize_by == 'numero_cliente':
+            return self._transform_parallel_by_cliente(X, n_jobs)
+        elif parallelize_by == 'column':
+            return self._transform_parallel_by_column(X, n_jobs)
+        else:
+            raise ValueError(f"parallelize_by debe ser 'foto_mes', 'numero_cliente' o 'column', recibido: {parallelize_by}")
+    
+    def _transform_parallel_by_foto_mes(self, X, n_jobs):
+        """
+        Paraleliza por foto_mes: procesa cada mes en paralelo.
+        """
+        if 'foto_mes' not in X.columns:
+            raise ValueError("El DataFrame debe contener la columna 'foto_mes' para paralelizar por foto_mes")
+        
+        # Obtener valores únicos de foto_mes ordenados
+        foto_mes_values = sorted(X['foto_mes'].unique())
+        
+        logger.info(f"Paralelizando por foto_mes: {len(foto_mes_values)} meses a procesar con {n_jobs} jobs")
+        
+        # Función auxiliar para procesar cada foto_mes
+        def process_foto_mes(fm):
+            df_subset = X[X['foto_mes'] == fm].copy()
+            return self._transform(df_subset)
+        
+        # Procesar en paralelo
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(process_foto_mes)(fm) for fm in foto_mes_values
+        )
+        
+        # Concatenar resultados manteniendo el orden original
+        X_transformed = pd.concat(results, axis=0)
+        # Reordenar según el índice original
+        X_transformed = X_transformed.loc[X.index]
+        
         return X_transformed
+    
+    def _transform_parallel_by_cliente(self, X, n_jobs):
+        """
+        Paraleliza por último dígito del numero_de_cliente: procesa cada grupo (0-9) en paralelo.
+        """
+        if 'numero_de_cliente' not in X.columns:
+            raise ValueError("El DataFrame debe contener la columna 'numero_de_cliente' para paralelizar por numero_cliente")
+        
+        # Calcular último dígito del numero_de_cliente
+        X = X.copy()
+        X['_ultimo_digito'] = (X['numero_de_cliente'] % 10).astype(int)
+        
+        # Valores únicos del último dígito (debería ser 0-9)
+        digitos = sorted(X['_ultimo_digito'].unique())
+        
+        logger.info(f"Paralelizando por último dígito de numero_de_cliente: {len(digitos)} grupos a procesar con {n_jobs} jobs")
+        
+        # Función auxiliar para procesar cada grupo de clientes
+        def process_cliente_group(digito):
+            df_subset = X[X['_ultimo_digito'] == digito].copy()
+            # Remover la columna auxiliar antes de transformar
+            df_subset = df_subset.drop(columns=['_ultimo_digito'])
+            return self._transform(df_subset)
+        
+        # Procesar en paralelo
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(process_cliente_group)(d) for d in digitos
+        )
+        
+        # Concatenar resultados manteniendo el orden original
+        X_transformed = pd.concat(results, axis=0)
+        # Reordenar según el índice original
+        X_transformed = X_transformed.loc[X.index]
+        
+        return X_transformed
+    
+    def _transform_parallel_by_column(self, X, n_jobs):
+        """
+        Paraleliza por columna: procesa cada columna en paralelo.
+        
+        Este método debe ser sobreescrito por transformers que procesen columnas independientemente.
+        No todos los transformers soportan este tipo de paralelización.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} no soporta paralelización por columna. "
+            "Use 'foto_mes' o 'numero_cliente' en su lugar."
+        )
+
 class CleanZerosTransformer(BaseTransformer):
 
     """
@@ -104,8 +212,6 @@ class CleanZerosTransformer(BaseTransformer):
         
         X_transformed.loc[X_transformed["foto_mes"] == 202006, zero_cols] = np.nan        
         return X_transformed
-
-
 
 class PercentileTransformer(BaseTransformer):
     """
@@ -281,6 +387,86 @@ class PercentileTransformer(BaseTransformer):
             X[col] = X.groupby('foto_mes')[col].transform(calculate_percentile_for_group)
         
         return X
+    
+    def _transform_parallel_by_column(self, X, n_jobs):
+        """
+        Paraleliza por columna: procesa cada columna en paralelo.
+        Cada columna se transforma independientemente, lo que permite un buen paralelismo.
+        """
+        if 'foto_mes' not in X.columns:
+            raise ValueError("El DataFrame debe contener la columna 'foto_mes'")
+        
+        logger.info(f"Paralelizando por columna: {len(self.selected_variables_)} columnas a procesar con {n_jobs} jobs")
+        
+        X_copy = X.copy()
+        
+        def calculate_percentile_for_group(series):
+            """
+            Calcula percentiles para un mes específico.
+            - 0 permanece como 0
+            - Positivos se rankean entre sí (0-100)
+            - Negativos se rankean usando valor absoluto y se aplica signo negativo (-100 a 0)
+            """
+            v = series.values
+            
+            # Máscaras separadas
+            mask_nan = np.isnan(v)
+            mask_zero = (v == 0)
+            mask_pos = (v > 0)
+            mask_neg = (v < 0)
+            
+            # Inicializar resultado
+            result = np.zeros_like(v, dtype=np.float32)
+            
+            # === Positivos ===
+            if mask_pos.any():
+                pos_values = v[mask_pos]
+                
+                # rank sin nans
+                ranks = stats.rankdata(pos_values, method='min')
+                if len(pos_values) > 1:
+                    percentiles = (ranks - 1) / (len(pos_values) - 1) * 100
+                else:
+                    percentiles = np.array([50.0])
+                
+                result[mask_pos] = percentiles.astype(np.float32)
+            
+            # === Negativos ===
+            if mask_neg.any():
+                neg_values = np.abs(v[mask_neg])
+                
+                ranks = stats.rankdata(neg_values, method='min')
+                if len(neg_values) > 1:
+                    percentiles = (ranks - 1) / (len(neg_values) - 1) * 100
+                else:
+                    percentiles = np.array([50.0])
+                
+                result[mask_neg] = -percentiles.astype(np.float32)
+            
+            # === Restituir ceros ===
+            result[mask_zero] = 0.0
+            
+            # === Restituir NaNs ===
+            result[mask_nan] = np.nan
+            
+            return pd.Series(result, index=series.index)
+        
+        # Función para procesar una sola columna
+        def process_column(col):
+            # Agrupar por foto_mes y aplicar la transformación de percentiles
+            return X_copy.groupby('foto_mes')[col].transform(calculate_percentile_for_group)
+        
+        # Procesar columnas en paralelo
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(process_column)(col) for col in self.selected_variables_
+        )
+        
+        # Asignar resultados a X_copy
+        for col, result_series in zip(self.selected_variables_, results):
+            X_copy[col] = result_series
+        
+        return X_copy
+    
     def fit_transform(self, X, y=None):
         """Ajusta y transforma en un solo paso"""
         return self.fit(X, y).transform(X)
