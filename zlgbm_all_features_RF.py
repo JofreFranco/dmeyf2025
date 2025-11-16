@@ -8,14 +8,7 @@ from experiment_utils import *
 from dmeyf2025.metrics.revenue import gan_eval
 from dmeyf2025.etl.etl import prepare_data
 pd.set_option('display.max_columns', None)
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    filename='/home/martin232009/buckets/b1/experiment.log',
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    force=True
-)
-
+logger = setup_logger()
 def get_features(X, training_months):
     X_transformed = X
     
@@ -31,7 +24,6 @@ def get_features(X, training_months):
         X_transformed,
         "IntraMonthTransformer",
         logger,
-        parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
     )
     X_transformed = apply_transformer(
             DatesTransformer(),
@@ -55,7 +47,6 @@ def get_features(X, training_months):
         X_transformed,
         "PeriodStatsTransformer",
         logger,
-        parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
     )
     new_cols = list(set(X_transformed.columns) - set(initial_cols))
     X_transformed = apply_transformer(
@@ -125,7 +116,7 @@ params = {
 }
 # Leer datos
 logger.info("Leyendo dataset")
-df = pd.read_csv('~/datasets/competencia_02_target.csv')
+df = pd.read_csv('competencia_02_target.csv')
 if debug_mode:
     n_seeds = 1
     df = df.sample(frac=0.1)
