@@ -66,7 +66,7 @@ class BaseTransformer(BaseEstimator, TransformerMixin):
         
         if parallelize_by == 'foto_mes':
             return self._transform_parallel_by_foto_mes(X, n_jobs)
-        elif parallelize_by == 'numero_cliente':
+        elif parallelize_by == 'numero_de_cliente':
             return self._transform_parallel_by_cliente(X, n_jobs)
         elif parallelize_by == 'column':
             return self._transform_parallel_by_column(X, n_jobs)
@@ -148,6 +148,10 @@ class BaseTransformer(BaseEstimator, TransformerMixin):
             f"{self.__class__.__name__} no soporta paralelización por columna. "
             "Use 'foto_mes' o 'numero_cliente' en su lugar."
         )
+    def fit_transform(self, X, **params):
+        self.fit(X)
+        X_transformed = self.transform(X, **params)
+        return X_transformed
 
 class CleanZerosTransformer(BaseTransformer):
 
@@ -735,13 +739,6 @@ class DeltaLagTransformer(BaseTransformer):
         
         return X_transformed
     
-    def transform(self, X):
-        """Alias para _transform"""
-        return self._transform(X)
-    
-    def fit_transform(self, X, y=None):
-        """Ajusta y transforma en un solo paso"""
-        return self.fit(X, y).transform(X)
 
 class PeriodStatsTransformer(BaseTransformer):
     def __init__(self, periods=[6], exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):

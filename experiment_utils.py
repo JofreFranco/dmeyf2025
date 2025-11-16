@@ -12,14 +12,38 @@ from dmeyf2025.metrics.revenue import gan_eval
 from dmeyf2025.processors.feature_processors import AddCanaritos
 
 pd.set_option('display.max_columns', None)
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()  # Para mostrar en consola
-    ]
-)
+
+def setup_logger(log_file="/home/martin232009/buckets/b1/experiment.log"):
+
+    logger = logging.getLogger("main")
+    logger.setLevel(logging.INFO)
+
+    # Evitar duplicados
+    if logger.handlers:
+        return logger
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(message)s"
+    )
+
+    # ---- File handler ----
+    try:
+        fh = logging.FileHandler(log_file, mode="a")
+        fh.setLevel(logging.INFO)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+        print(f"[LOG] FileHandler creado OK en: {log_file}")
+    except Exception as e:
+        print(f"[ERROR] FileHandler falló: {e}")
+
+    # ---- Console handler ----
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    return logger
+logger = setup_logger()
 def memory_gb(df: pd.DataFrame) -> float:
     return df.memory_usage().sum() / (1024 ** 3)
 
@@ -300,3 +324,7 @@ def identify_low_importance_features(
         'n_low_importance': len(low_importance_features),
         'n_total_features': len(feature_cols)
     }
+
+
+
+

@@ -18,15 +18,7 @@ from dmeyf2025.pipelines import load_data, preprocessing_pipeline, optimization_
 
 FORCE_DEBUG = False
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s',
-    datefmt='%H:%M:%S',
-    handlers=[logging.StreamHandler()]
-)
-
-logger = logging.getLogger(__name__)
-
+logger = setup_logger()
 parser = argparse.ArgumentParser(
     description="Run experiment with specified config file."
     )
