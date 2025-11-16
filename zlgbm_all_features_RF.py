@@ -27,56 +27,64 @@ def get_features(X, training_months):
     )
     X_transformed = apply_transformer(
         IntraMonthTransformer(
-            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"], parallel=True, parallelize_by='numero_de_cliente'),
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"]),
         X_transformed,
         "IntraMonthTransformer",
-        logger
+        logger,
+        parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
     )
     X_transformed = apply_transformer(
-            DatesTransformer(parallel=True, parallelize_by='numero_de_cliente'),
+            DatesTransformer(),
             X_transformed,
             "DatesTransformer",
-            logger
+            logger,
+            parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
         )
     X_transformed = apply_transformer(
-        HistoricalFeaturesTransformer(parallel=True, parallelize_by='numero_de_cliente'),
+        HistoricalFeaturesTransformer(),
         X_transformed,
         "HistoricalFeaturesTransformer",
-        logger
+        logger,
+        parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
     )
     initial_cols =X_transformed.columns
     X_transformed = apply_transformer(
         PeriodStatsTransformer(
             periods=[6],
-            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"], parallel=True, parallelize_by='numero_de_cliente'),
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"]),
         X_transformed,
         "PeriodStatsTransformer",
-        logger
+        logger,
+        parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
     )
     new_cols = list(set(X_transformed.columns) - set(initial_cols))
     X_transformed = apply_transformer(
         TendencyTransformer(
-            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"] + new_cols, parallel=True, parallelize_by='numero_de_cliente'),
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"] + new_cols),
         X_transformed,
         "TendencyTransformer",
-        logger)
+        logger,
+        parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
+    )
     new_cols = list(set(X_transformed.columns) - set(initial_cols))
     X_transformed = apply_transformer(
         DeltaLagTransformer(
             n_lags=2,
             exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"] + new_cols
-        , parallel=True, parallelize_by='numero_de_cliente'),
+        ),
         X_transformed,
         "DeltaLagTransformer",
-        logger
+        logger,
+        parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
     )
     X_transformed = apply_transformer(
         PercentileTransformer(
             replace_original=True
-        , parallel=True, parallelize_by='foto_mes'),
+        ),
         X_transformed,
         "PercentileTransformer",
-        logger
+        logger,
+        parallel=True, parallelize_by='foto_mes', n_jobs=-1
     )
     X_transformed = apply_transformer(
         RandomForestFeaturesTransformer(training_months= training_months),

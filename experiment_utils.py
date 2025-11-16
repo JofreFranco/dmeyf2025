@@ -23,13 +23,13 @@ logging.basicConfig(
 def memory_gb(df: pd.DataFrame) -> float:
     return df.memory_usage().sum() / (1024 ** 3)
 
-def apply_transformer(transformer, X, name: str, logger, VERBOSE=False):
+def apply_transformer(transformer, X, name: str, logger, VERBOSE=False, parallel=False, parallelize_by='foto_mes', n_jobs=-1):
     logger.info(f"[{name}] Iniciando…")
 
     start_mem = memory_gb(X)
     start_time = time.time()
 
-    Xt = transformer.fit_transform(X)
+    Xt = transformer.fit_transform(X, parallel=parallel, parallelize_by=parallelize_by, n_jobs=n_jobs)
 
     end_time = time.time()
     end_mem = memory_gb(Xt)
