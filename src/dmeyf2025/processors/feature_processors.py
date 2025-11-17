@@ -471,9 +471,6 @@ class PercentileTransformer(BaseTransformer):
         
         return X_copy
     
-    def fit_transform(self, X, y=None):
-        """Ajusta y transforma en un solo paso"""
-        return self.fit(X, y).transform(X)
 
 class LagTransformer(BaseTransformer):
     """
