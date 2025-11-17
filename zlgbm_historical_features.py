@@ -88,7 +88,7 @@ results_file = "/home/martin232009/buckets/b1/results.csv"
 fieldnames = ["experiment_name", "seed", "training_time", "moving_average_rev"]
 logging.info("comenzando")
 features_to_drop = ["cprestamos_prendarios", "mprestamos_prendarios", "cprestamos_personales", "mprestamos_personales"]
-canaritos = 10
+canaritos = 5
 gradient_bound = 0.1
 n_seeds = 5
 min_data_in_leaf = 20
