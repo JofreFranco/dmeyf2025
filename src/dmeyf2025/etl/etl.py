@@ -176,7 +176,7 @@ class ETL:
         logger.info("Pipeline ETL completado exitosamente!")
         return X, y
 
-def prepare_data(df, training_months, eval_month, test_month, get_features, weight, sampling_rate):
+def prepare_data(df, training_months, eval_month, test_month, get_features, weight, sampling_rate, aug_positives=False):
     df["label"] = ((df["clase_ternaria"] == "BAJA+2") | (df["clase_ternaria"] == "BAJA+1")).astype(int)
     df["weight"] = np.array([weight[item] for item in df["clase_ternaria"]])
     df = df.drop(columns=["clase_ternaria"])
@@ -187,6 +187,9 @@ def prepare_data(df, training_months, eval_month, test_month, get_features, weig
         df_train = df_transformed[df_transformed["foto_mes"].isin(training_months)]
     else:
         df_train = df_transformed[~df_transformed["foto_mes"] < eval_month]
+    if aug_positives:
+        positives = df_transformed[(df_transformed["foto_mes"]<eval_month) and (df_transformed["foto_mes"]>training_months[-1]) and (df_transformed["label"]==1)]
+        df_train = pd.concat([df_train, positives], axis=0)
     df_eval = df_transformed[df_transformed["foto_mes"] == eval_month]
     df_test = df_transformed[df_transformed["foto_mes"] == test_month]
     del df_transformed

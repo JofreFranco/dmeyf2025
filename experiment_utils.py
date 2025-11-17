@@ -126,7 +126,7 @@ def print_memory_state():
         logger.info(f"Sistema RAM: {mem.percent:.1f}% usado, {mem.available / (1024**3):.2f} GB disponibles, total {mem.total / (1024**3):.2f} GB")
     except Exception as e:
         logger.warning(f"No se pudo leer estado de la RAM: {e}")
-def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames):
+def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames, user):
     revs = []
     for seed in seeds[:n_seeds]:
         params["seed"] = seed
@@ -135,7 +135,7 @@ def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, resul
         model = train_model(train_set, params)
         y_pred = model.predict(X_eval)
         if save_model:
-            joblib.dump(model, f"/home/martin232009/buckets/b1/models/{experiment_name}_{seed}.pkl")
+            joblib.dump(model, f"/home/{user}/buckets/b1/models/{experiment_name}_{seed}.pkl")
             save_model = False
         rev, _ = gan_eval(y_pred, w_eval, window=2001)
         revs.append(rev)
