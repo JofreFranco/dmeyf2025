@@ -30,7 +30,8 @@ def get_features(X, training_months):
         HistoricalFeaturesTransformer(),
         X_transformed,
         "HistoricalFeaturesTransformer",
-        logger
+        logger,
+        parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
     )
     initial_cols =X_transformed.columns
     X_transformed = apply_transformer(
@@ -40,7 +41,8 @@ def get_features(X, training_months):
         ),
         X_transformed,
         "PeriodStatsTransformer",
-        logger
+        logger,
+        parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
     )
     new_cols = list(set(X_transformed.columns) - set(initial_cols))
     X_transformed = apply_transformer(
@@ -49,7 +51,8 @@ def get_features(X, training_months):
         ),
         X_transformed,
         "TendencyTransformer",
-        logger
+        logger,
+        parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
     )
     new_cols = list(set(X_transformed.columns) - set(initial_cols))
     X_transformed = apply_transformer(
@@ -59,7 +62,8 @@ def get_features(X, training_months):
         ),
         X_transformed,
         "DeltaLagTransformer",
-        logger
+        logger,
+        parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
     )
     X_transformed = apply_transformer(
         PercentileTransformer(
@@ -67,7 +71,8 @@ def get_features(X, training_months):
         ),
         X_transformed,
         "PercentileTransformer",
-        logger
+        logger,
+        parallel=True, parallelize_by='foto_mes', n_jobs=-1
     )
     return X_transformed
 
@@ -77,9 +82,9 @@ experiment_name = "zlgbm-histfeatures"
 training_months = [201901, 201902, 201903, 201904, 201905, 201906, 201907, 201908,
        201909, 201910, 201911, 201912, 202001, 202002, 202003, 202004,
        202005, 202006, 202007, 202008, 202009, 202010, 202011, 202012,
-       202101, 202102, 202103, 202104]
+       202101, 202102, 202103, 202104, 202106, 202107]
 save_model = True
-eval_month = 202106
+eval_month = 202108
 test_month = 202108
 seeds = [537919, 923347, 173629, 419351, 287887, 1244, 24341, 1241, 4512, 6554, 62325, 6525235, 14, 4521, 474574, 74543, 32462, 12455, 5124, 55678]
 debug_mode = False

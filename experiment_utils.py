@@ -134,6 +134,9 @@ def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, resul
         logger.info(f"Entrenando modelo con seed: {seed}")
         model = train_model(train_set, params)
         y_pred = model.predict(X_eval)
+        if save_model:
+            joblib.dump(model, f"/home/martin232009/buckets/b1/models/{experiment_name}_{seed}.pkl")
+            save_model = False
         rev, _ = gan_eval(y_pred, w_eval, window=2001)
         revs.append(rev)
         if rev > 600000000:
@@ -143,9 +146,7 @@ def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, resul
 
         write_header = not os.path.exists(results_file)
         
-        if save_model:
-            joblib.dump(model, f"/home/martin232009/buckets/b1/models/{experiment_name}_{seed}.pkl")
-            save_model = False
+        
         end_time = time.time()
         result_row = {
             "experiment_name": experiment_name,
