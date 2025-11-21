@@ -293,7 +293,6 @@ class PercentileTransformer(BaseTransformer):
         
         return X
     
-
 class LagTransformer(BaseTransformer):
     """
     Calcula lags de variables para n_lags meses anteriores.
@@ -350,7 +349,6 @@ class LagTransformer(BaseTransformer):
             X_transformed = pd.concat([X_transformed] + new_columns, axis=1)
         
         return X_transformed
-
 
 class DeltaTransformer(BaseTransformer):
     """
@@ -410,7 +408,6 @@ class DeltaTransformer(BaseTransformer):
             X_transformed = pd.concat([X_transformed] + new_columns, axis=1)
         
         return X_transformed
-
 
 class DeltaLagTransformer(BaseTransformer):
     """
@@ -491,7 +488,6 @@ class DeltaLagTransformer(BaseTransformer):
         
         return X_transformed
     
-
 class PeriodStatsTransformer(BaseTransformer):
     def __init__(self, periods=[6], exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         self.periods = periods
@@ -522,7 +518,6 @@ class PeriodStatsTransformer(BaseTransformer):
             X = pd.concat([X] + new_columns, axis=1)
         
         return X
-
 
 class TendencyTransformer(BaseTransformer):
     """
@@ -590,7 +585,6 @@ class TendencyTransformer(BaseTransformer):
         X_out = X.assign(**new_cols)
         return X_out
 
-
 class IntraMonthTransformer(BaseTransformer):
 
     def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
@@ -619,7 +613,6 @@ class IntraMonthTransformer(BaseTransformer):
         X_transformed["status"] = (X_transformed["Visa_status"] + X_transformed["Master_status"])
         
         return X_transformed
-
 
 class HistoricalFeaturesTransformer(BaseTransformer):
     """
@@ -693,7 +686,6 @@ class HistoricalFeaturesTransformer(BaseTransformer):
         
         return X_transformed
 
-
 class DatesTransformer(BaseTransformer):
     def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         self.exclude_cols = exclude_cols
@@ -706,7 +698,6 @@ class DatesTransformer(BaseTransformer):
         X_transformed["Visa_recencia"] = X_transformed["cliente_antiguedad"] - X_transformed["Visa_fechaalta_meses"]
 
         return X_transformed
-
 
 class RandomForestFeaturesTransformer(BaseTransformer):
     def __init__(self, exclude_cols=["numero_de_cliente", "label", "weight", "clase_ternaria", "target"], n_estimators=20, num_leaves=16, min_data_in_leaf=100, feature_fraction_bynode=0.2, training_months= []):
@@ -789,6 +780,17 @@ class RandomForestFeaturesTransformer(BaseTransformer):
         
         return X
 
+class RatioLagsTransformer(BaseTransformer):
+    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"], n_lags=2):
+        self.exclude_cols = exclude_cols
+        self.n_lags = n_lags
+    def _transform(self, X):
+        X_transformed = X
+        for n_lag in range(1, self.n_lags + 1):
+            lag_columns = [col for col in X_transformed.columns if f"_lag{n_lag}" in col]
+            for col in lag_columns:
+                X_transformed[col] = X_transformed[col.replace(f"_lag{n_lag}", "")] / X_transformed[col] + np.finfo(float).eps
+        return X_transformed
 
 class AddCanaritos(BaseTransformer):
     def __init__(self, n_canaritos=10):
