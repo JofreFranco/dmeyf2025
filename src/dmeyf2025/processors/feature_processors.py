@@ -299,7 +299,17 @@ class LagTransformer(BaseTransformer):
     Si no hay información del mes anterior, se deja en nulo.
     """
     
-    def __init__(self, n_lags=1, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
+    def __init__(self, n_lags=1, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight", 'cliente_edad', 'cliente_antiguedad',
+    "cliente_vip",
+    "Visa_fultimo_cierre",
+    "Master_Finiciomora",
+    "Visa_Finiciomora",
+    "Master_delinquency",
+    "Visa_delinquency",
+    "active_quarter",
+    "clase_ternaria",
+    'Visa_fechaalta',
+    'Master_fechaalta']):
         """
         Parameters:
         -----------
@@ -356,7 +366,17 @@ class DeltaTransformer(BaseTransformer):
     Si no hay información del mes anterior, se deja en nulo.
     """
     
-    def __init__(self, n_deltas=1, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
+    def __init__(self, n_deltas=1, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight", 'cliente_edad', 'cliente_antiguedad',
+    "cliente_vip",
+    "Visa_fultimo_cierre",
+    "Master_Finiciomora",
+    "Visa_Finiciomora",
+    "Master_delinquency",
+    "Visa_delinquency",
+    "active_quarter",
+    "clase_ternaria",
+    'Visa_fechaalta',
+    'Master_fechaalta']):
         """
         Parameters:
         -----------
@@ -415,7 +435,17 @@ class DeltaLagTransformer(BaseTransformer):
     Para cada columna genera: col_lag1, col_lag2, col_delta1, col_delta2
     """
     
-    def __init__(self, n_lags=2, exclude_cols=None):
+    def __init__(self, n_lags=2, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight", 'cliente_edad', 'cliente_antiguedad',
+    "cliente_vip",
+    "Visa_fultimo_cierre",
+    "Master_Finiciomora",
+    "Visa_Finiciomora",
+    "Master_delinquency",
+    "Visa_delinquency",
+    "active_quarter",
+    "clase_ternaria",
+    'Visa_fechaalta',
+    'Master_fechaalta']):
         """
         Parameters:
         -----------
@@ -425,9 +455,7 @@ class DeltaLagTransformer(BaseTransformer):
             Columnas a excluir del cálculo
         """
         self.n_lags = n_lags
-        self.exclude_cols = exclude_cols if exclude_cols is not None else [
-            "foto_mes", "numero_de_cliente", "target", "label", "weight"
-        ]
+        self.exclude_cols = exclude_cols
     
     def _transform(self, X):
         """
@@ -489,7 +517,17 @@ class DeltaLagTransformer(BaseTransformer):
         return X_transformed
     
 class PeriodStatsTransformer(BaseTransformer):
-    def __init__(self, periods=[6], exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
+    def __init__(self, periods=[6], exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight", 'cliente_edad', 'cliente_antiguedad',
+    "cliente_vip",
+    "Visa_fultimo_cierre",
+    "Master_Finiciomora",
+    "Visa_Finiciomora",
+    "Master_delinquency",
+    "Visa_delinquency",
+    "active_quarter",
+    "clase_ternaria",
+    'Visa_fechaalta',
+    'Master_fechaalta']):
         self.periods = periods
         self.exclude_cols = exclude_cols
     
@@ -523,7 +561,17 @@ class TendencyTransformer(BaseTransformer):
     """
     Calcula la pendiente de regresión lineal de cada variable numérica para cada cliente usando una ventana de 6 meses.
     """
-    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"], window=6):
+    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight", 'cliente_edad', 'cliente_antiguedad',
+    "cliente_vip",
+    "Visa_fultimo_cierre",
+    "Master_Finiciomora",
+    "Visa_Finiciomora",
+    "Master_delinquency",
+    "Visa_delinquency",
+    "active_quarter",
+    "clase_ternaria",
+    'Visa_fechaalta',
+    'Master_fechaalta'], window=6):
         self.exclude_cols = exclude_cols
         self.window = window
 
@@ -587,7 +635,17 @@ class TendencyTransformer(BaseTransformer):
 
 class IntraMonthTransformer(BaseTransformer):
 
-    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
+    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight", 'cliente_edad', 'cliente_antiguedad',
+    "cliente_vip",
+    "Visa_fultimo_cierre",
+    "Master_Finiciomora",
+    "Visa_Finiciomora",
+    "Master_delinquency",
+    "Visa_delinquency",
+    "active_quarter",
+    "clase_ternaria",
+    'Visa_fechaalta',
+    'Master_fechaalta']):
         self.exclude_cols = exclude_cols
     
     def _transform(self, X):
@@ -619,7 +677,17 @@ class HistoricalFeaturesTransformer(BaseTransformer):
     Transformer que genera features históricos basados en datos de meses anteriores.
     Incluye promedios móviles, comparaciones temporales y eventos históricos.
     """
-    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
+    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight", 'cliente_edad', 'cliente_antiguedad',
+    "cliente_vip",
+    "Visa_fultimo_cierre",
+    "Master_Finiciomora",
+    "Visa_Finiciomora",
+    "Master_delinquency",
+    "Visa_delinquency",
+    "active_quarter",
+    "clase_ternaria",
+    'Visa_fechaalta',
+    'Master_fechaalta']):
         self.exclude_cols = exclude_cols
 
     def _transform(self, X):
@@ -687,7 +755,17 @@ class HistoricalFeaturesTransformer(BaseTransformer):
         return X_transformed
 
 class DatesTransformer(BaseTransformer):
-    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
+    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight", 'cliente_edad', 'cliente_antiguedad',
+    "cliente_vip",
+    "Visa_fultimo_cierre",
+    "Master_Finiciomora",
+    "Visa_Finiciomora",
+    "Master_delinquency",
+    "Visa_delinquency",
+    "active_quarter",
+    "clase_ternaria",
+    'Visa_fechaalta',
+    'Master_fechaalta']):
         self.exclude_cols = exclude_cols
     
     def _transform(self, X):
@@ -781,7 +859,17 @@ class RandomForestFeaturesTransformer(BaseTransformer):
         return X
 
 class RatioLagsTransformer(BaseTransformer):
-    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"], n_lags=2):
+    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight", 'cliente_edad', 'cliente_antiguedad',
+    "cliente_vip",
+    "Visa_fultimo_cierre",
+    "Master_Finiciomora",
+    "Visa_Finiciomora",
+    "Master_delinquency",
+    "Visa_delinquency",
+    "active_quarter",
+    "clase_ternaria",
+    'Visa_fechaalta',
+    'Master_fechaalta'], n_lags=2):
         self.exclude_cols = exclude_cols
         self.n_lags = n_lags
     def _transform(self, X):
@@ -790,6 +878,53 @@ class RatioLagsTransformer(BaseTransformer):
             lag_columns = [col for col in X_transformed.columns if f"_lag{n_lag}" in col]
             for col in lag_columns:
                 X_transformed[col] = X_transformed[col.replace(f"_lag{n_lag}", "")] / X_transformed[col] + np.finfo(float).eps
+        return X_transformed
+
+class AvgRatioTransformer(BaseTransformer):
+    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight", 'cliente_edad', 'cliente_antiguedad',
+    "cliente_vip",
+    "Visa_fultimo_cierre",
+    "Master_Finiciomora",
+    "Visa_Finiciomora",
+    "Master_delinquency",
+    "Visa_delinquency",
+    "active_quarter", "clase_ternaria", 'Visa_fechaalta', 'Master_fechaalta'], months=3):
+        self.exclude_cols = exclude_cols
+        self.months = months
+    
+    def _transform(self, X):
+        X_transformed = X.copy()
+        
+        # Ordenar por cliente y foto_mes
+        X_transformed = X_transformed.sort_values(['numero_de_cliente', 'foto_mes'])
+        
+        # Obtener las columnas numéricas a procesar
+        numeric_cols = []
+        for col in X_transformed.columns:
+            if col in self.exclude_cols:
+                continue
+            if "_lag" in col or "_delta" in col or "_ratio" in col or "_avg" in col:
+                continue
+            if pd.api.types.is_numeric_dtype(X_transformed[col]):
+                numeric_cols.append(col)
+        
+        # Calcular el promedio de los últimos  meses y el ratio para cada columna
+        for col in numeric_cols:
+            avg_col_name = f"{col}_avg_{self.months}m"
+            X_transformed[avg_col_name] = (
+                X_transformed.groupby("numero_de_cliente")[col]
+                .shift(1)
+                .rolling(window=self.months, min_periods=1)
+                .mean()
+                .reset_index(level=0, drop=True)
+            )
+            
+            # Calcular el ratio variable/avg_variable
+            ratio_col_name = f"{col}_avg_ratio_{self.months}m"
+            X_transformed[ratio_col_name] = X_transformed[col] / (X_transformed[avg_col_name] + np.finfo(float).eps)
+        
+        logger.info(f"AvgRatioTransformer: Se generaron {len(numeric_cols) * 2} columnas (promedios y ratios) para {self.months} meses")
+        
         return X_transformed
 
 class AddCanaritos(BaseTransformer):
