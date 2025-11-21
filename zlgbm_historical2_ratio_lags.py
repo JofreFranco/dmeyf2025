@@ -12,6 +12,7 @@ from config import *
 pd.set_option('display.max_columns', None)
 
 sampling_rate = 0.02
+experiment_name = "zlgbm-histfeatures2-ratiolags"
 experiment_name = f"{experiment_name}_c{canaritos}_gb{experiment_name}_s{sampling_rate}_u{(params['is_unbalance'])}"
 
 logging.basicConfig(
