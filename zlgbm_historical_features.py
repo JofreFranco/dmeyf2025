@@ -5,8 +5,7 @@ import numpy as np
 import time
 import lightgbm as lgb
 from dmeyf2025.processors.feature_processors import CleanZerosTransformer, DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer, TendencyTransformer, IntraMonthTransformer, RandomForestFeaturesTransformer, DatesTransformer, HistoricalFeaturesTransformer, AddCanaritos
-from experiment_utils import *
-from dmeyf2025.metrics.revenue import gan_eval
+from dmeyf2025.utils.experiment_utils import *
 from dmeyf2025.etl.etl import prepare_data
 from config import *
 
