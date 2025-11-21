@@ -13,13 +13,12 @@ from dmeyf2025.processors.feature_processors import AddCanaritos
 
 pd.set_option('display.max_columns', None)
 
-# Logger del módulo - heredará configuración del root logger
 logger = logging.getLogger(__name__)
 
 def memory_gb(df: pd.DataFrame) -> float:
     return df.memory_usage().sum() / (1024 ** 3)
 
-def apply_transformer(transformer, X, name: str, VERBOSE=False, parallel=False, parallelize_by='foto_mes', n_jobs=-1):
+def apply_transformer(transformer, X, name: str, parallel=False, parallelize_by='foto_mes', n_jobs=-1):
     logger.info(f"[{name}] Iniciando…")
 
     start_mem = memory_gb(X)
@@ -39,10 +38,7 @@ def apply_transformer(transformer, X, name: str, VERBOSE=False, parallel=False, 
         f"Diferencia: {end_mem - start_mem:+.3f} GB | "
         f"Shape: {n_rows:,} filas × {n_cols:,} columnas"
     )
-    if VERBOSE:
-        display(Xt.head())
-        display(Xt.describe())
-        logger.info(f"Nulos: {Xt.isna().astype(int).sum()}")
+
     gc.collect()
     return Xt
 
