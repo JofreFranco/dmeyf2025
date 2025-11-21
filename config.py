@@ -1,7 +1,7 @@
 debug_mode = True
 VERBOSE = False
 gcp = False
-user = "martin232009"
+user = "emicardosomartinez"
 experiment_name = "zlgbm-histfeatures"
 dataset_path = "data/competencia_01_target.csv"
 training_months = [201901, 201902, 201903, 201904, 201905, 201906, 201907, 201908,
@@ -13,13 +13,13 @@ eval_month = 202104
 test_month = 202108
 seeds = [537919, 923347, 173629, 419351, 287887, 1244, 24341, 1241, 4512, 6554, 62325, 6525235, 14, 4521, 474574, 74543, 32462, 12455, 5124, 55678]
 
-sampling_rate = 0.5
+sampling_rate = 0.02
 
 fieldnames = ["experiment_name", "seed", "training_time", "moving_average_rev"]
 features_to_drop = ["cprestamos_prendarios", "mprestamos_prendarios", "cprestamos_personales", "mprestamos_personales"]
 canaritos = 5
 gradient_bound = 0.1
-n_seeds = 5
+n_seeds = 10
 min_data_in_leaf = 20
 params = {
     "canaritos": canaritos,

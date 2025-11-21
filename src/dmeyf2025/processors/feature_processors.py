@@ -873,11 +873,17 @@ class RatioLagsTransformer(BaseTransformer):
         self.exclude_cols = exclude_cols + add_exclude_cols
         self.n_lags = n_lags
     def _transform(self, X):
-        X_transformed = X
+        X_transformed = X.copy()
+        all_new_cols = {}
         for n_lag in range(1, self.n_lags + 1):
             lag_columns = [col for col in X_transformed.columns if f"_lag{n_lag}" in col]
             for col in lag_columns:
-                X_transformed[col] = X_transformed[col.replace(f"_lag{n_lag}", "")] / X_transformed[col] + np.finfo(float).eps
+                col_base = col.replace(f"_lag{n_lag}", "")
+                new_col_name = col.replace(f"_lag{n_lag}", f"_ratiolag{n_lag}")
+                all_new_cols[new_col_name] = X_transformed[col_base] / (X_transformed[col] + np.finfo(float).eps)
+        if all_new_cols:
+            new_cols_df = pd.DataFrame(all_new_cols, index=X_transformed.index)
+            X_transformed = pd.concat([X_transformed, new_cols_df], axis=1)
         return X_transformed
 
 class AvgRatioTransformer(BaseTransformer):

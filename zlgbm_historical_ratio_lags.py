@@ -70,6 +70,16 @@ def get_features(X, training_months):
         "DeltaLagTransformer",
         parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
     )
+    new_cols = list(set(X_transformed.columns) - set(initial_cols))
+    X_transformed = apply_transformer(
+        RatioLagsTransformer(
+            n_lags=1,
+            add_exclude_cols=new_cols
+        ),
+        X_transformed,
+        "RatioLagsTransformer",
+        parallel=True, parallelize_by='foto_mes', n_jobs=-1
+    )
     X_transformed = apply_transformer(
         PercentileTransformer(
             replace_original=True

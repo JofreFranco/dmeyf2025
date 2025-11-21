@@ -4,15 +4,13 @@ import pandas as pd
 import numpy as np
 import time
 import lightgbm as lgb
-from dmeyf2025.processors.feature_processors import CleanZerosTransformer, DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer, TendencyTransformer, IntraMonthTransformer, RandomForestFeaturesTransformer, DatesTransformer, HistoricalFeaturesTransformer, AddCanaritos, apply_transformer, AvgRatioTransformer, RatioLagsTransformer
+from dmeyf2025.processors.feature_processors import CleanZerosTransformer, DeltaLagTransformer, PercentileTransformer, PeriodStatsTransformer, TendencyTransformer, IntraMonthTransformer, RandomForestFeaturesTransformer, DatesTransformer, HistoricalFeaturesTransformer, AddCanaritos, apply_transformer
 from dmeyf2025.utils.experiment_utils import *
 from dmeyf2025.etl import prepare_data
 from config import *
 
 pd.set_option('display.max_columns', None)
 
-sampling_rate = 0.02
-experiment_name = f"{experiment_name}_c{canaritos}_gb{experiment_name}_s{sampling_rate}_u{(params['is_unbalance'])}"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,18 +32,17 @@ def get_features(X, training_months):
         X_transformed,
         "CleanZerosTransformer"
     )
-    initial_cols =X_transformed.columns
     X_transformed = apply_transformer(
-        AvgRatioTransformer(months=3),
+        HistoricalFeaturesTransformer(),
         X_transformed,
-        "AvgRatioTransformer",
+        "HistoricalFeaturesTransformer",
         parallel=True, parallelize_by='numero_de_cliente', n_jobs=-1
     )
-    new_cols = list(set(X_transformed.columns) - set(initial_cols))
+    initial_cols =X_transformed.columns
     X_transformed = apply_transformer(
         PeriodStatsTransformer(
             periods=[6],
-            add_exclude_cols=new_cols
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"]
         ),
         X_transformed,
         "PeriodStatsTransformer",
@@ -54,7 +51,7 @@ def get_features(X, training_months):
     new_cols = list(set(X_transformed.columns) - set(initial_cols))
     X_transformed = apply_transformer(
         TendencyTransformer(
-            add_exclude_cols=new_cols
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"] + new_cols
         ),
         X_transformed,
         "TendencyTransformer",
@@ -64,7 +61,7 @@ def get_features(X, training_months):
     X_transformed = apply_transformer(
         DeltaLagTransformer(
             n_lags=2,
-            add_exclude_cols=new_cols
+            exclude_cols=["foto_mes","numero_de_cliente","target","label","weight","clase_ternaria"] + new_cols
         ),
         X_transformed,
         "DeltaLagTransformer",
