@@ -13,7 +13,7 @@ eval_month = 202104
 test_month = 202108
 seeds = [537919, 923347, 173629, 419351, 287887, 1244, 24341, 1241, 4512, 6554, 62325, 6525235, 14, 4521, 474574, 74543, 32462, 12455, 5124, 55678]
 
-sampling_rate = 0.02
+sampling_rate = 0.5
 
 fieldnames = ["experiment_name", "seed", "training_time", "moving_average_rev"]
 features_to_drop = ["cprestamos_prendarios", "mprestamos_prendarios", "cprestamos_personales", "mprestamos_personales"]
