@@ -13,7 +13,7 @@ from sklearn.utils import resample
 logger = logging.getLogger(__name__)
 
 
-class SamplerProcessor(BaseEstimator, TransformerMixin):
+class SamplerProcessor():
     """
     Procesador de sklearn para realizar sampling aleatorio de un DataFrame.
     
@@ -31,12 +31,6 @@ class SamplerProcessor(BaseEstimator, TransformerMixin):
         self.sample_ratio = sample_ratio
         self.debug = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
         self.random_state = random_state
-        
-    def fit(self, X: pd.DataFrame, y: Optional[Any] = None) -> 'SamplerProcessor':
-        """
-        Método fit requerido por sklearn.
-        """
-        return self
 
     def transform(self, X: pd.DataFrame, y) -> pd.DataFrame:
         """
@@ -53,7 +47,6 @@ class SamplerProcessor(BaseEstimator, TransformerMixin):
         if self.sample_ratio >= 1.0:
             return X, y
 
-        # Construimos un DataFrame que incluye y para facilitar muestreo conjunto
         df_sampled = X
         df_sampled.loc[:, 'label'] = y
         del X, y
@@ -81,12 +74,8 @@ class SamplerProcessor(BaseEstimator, TransformerMixin):
         del other_classes, continua_cases, continua_mask, df_sampled
         gc.collect()
 
-        logger.info(f"✅ Dataset final: {len(df_final)} registros")
+        logger.info(f"Dataset final: {len(df_final)} registros")
         logger.info(f"   - Clase positiva: {(df_final['label'] == 1).sum()}")
         logger.info(f"   - Clase negativa: {(df_final['label'] == 0).sum()}")
         
         return df_final.drop(columns=['label']), df_final['label']
-
-       
-    def fit_transform(self, X: pd.DataFrame, y: Optional[Any] = None) -> pd.DataFrame:
-        return self.transform(X, y) 

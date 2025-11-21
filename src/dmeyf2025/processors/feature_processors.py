@@ -30,6 +30,7 @@ def calculate_percentile_with_sign(group, n_bins=None):
         else:
             result[pos_mask] = pos_percentiles
     return result
+
 class BaseTransformer():
     def fit(self, X, y=None):
         return self
@@ -160,52 +161,46 @@ class CleanZerosTransformer(BaseTransformer):
     """
     def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         self.exclude_cols = exclude_cols
-        self.variable_pairs_ = None
     
-    def fit(self, X, y=None):
-        """Identifica los pares de variables cVARIABLE y mVARIABLE."""
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
+    def _transform(self, X):
+
+        X_transformed = X
         
         # Detectar todas las columnas que empiezan con 'c' y 'm'
-        c_columns = [col for col in X.columns if col.startswith('c') and col not in self.exclude_cols]
-        m_columns = [col for col in X.columns if col.startswith('m') and col not in self.exclude_cols]
+        c_columns = [col for col in X_transformed.columns if col.startswith('c') and col not in self.exclude_cols]
+        m_columns = [col for col in X_transformed.columns if col.startswith('m') and col not in self.exclude_cols]
         
         # Encontrar pares donde existe tanto cVARIABLE como mVARIABLE
-        self.variable_pairs_ = []
+        variable_pairs = []
         for c_col in c_columns:
-            # Extraer el nombre de la variable (sin el prefijo 'c')
             var_name = c_col[1:]  # Eliminar la 'c' del inicio
             m_col = 'm' + var_name
             
             if m_col in m_columns:
-                self.variable_pairs_.append((c_col, m_col))
-        
-        return self
-    
-    def _transform(self, X):
-        """
-        Pone en None los montos (mVARIABLE) cuando la cantidad (cVARIABLE) es 0.
-        """
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-        
-        X_transformed = X
+                variable_pairs.append((c_col, m_col))
         
         # Para cada par detectado, limpiar los montos cuando cantidad = 0
-        for c_col, m_col in self.variable_pairs_:
+        for c_col, m_col in variable_pairs:
             if c_col in X_transformed.columns and m_col in X_transformed.columns:
                 zero_mask = X_transformed[c_col] == 0
                 X_transformed.loc[zero_mask, m_col] = np.nan
         
         # Limpiar antes del mes 202010 tmobile_app
-        X_transformed.loc[X_transformed["foto_mes"] < 202010, "tmobile_app"] = np.nan
+        if "tmobile_app" in X_transformed.columns:
+            X_transformed.loc[X_transformed["foto_mes"] < 202010, "tmobile_app"] = np.nan
 
         # Limpiar variables rotas del 202006
-        #detectar todas las columnas que son SOLO 0 en el 202006
-        zero_cols = X_transformed[X_transformed["foto_mes"] == 202006].columns[X_transformed[X_transformed["foto_mes"] == 202006].apply(lambda x: x.nunique()) == 1].drop("foto_mes")
+        # Detectar todas las columnas que son SOLO 0 en el 202006
+        if (X_transformed["foto_mes"] == 202006).any():
+            df_202006 = X_transformed[X_transformed["foto_mes"] == 202006]
+            zero_cols_mask = df_202006.apply(lambda x: x.nunique()) == 1
+            zero_cols = df_202006.columns[zero_cols_mask]
+            # Remover foto_mes si está en la lista
+            zero_cols = [col for col in zero_cols if col != "foto_mes"]
+            
+            if len(zero_cols) > 0:
+                X_transformed.loc[X_transformed["foto_mes"] == 202006, zero_cols] = np.nan
         
-        X_transformed.loc[X_transformed["foto_mes"] == 202006, zero_cols] = np.nan        
         return X_transformed
 
 class PercentileTransformer(BaseTransformer):
@@ -231,230 +226,66 @@ class PercentileTransformer(BaseTransformer):
         self.variables = variables
         self.exclude_cols = exclude_cols if exclude_cols is not None else ["foto_mes", "numero_de_cliente", "target", "label", "weight"]
         self.replace_original = replace_original
-        self.selected_variables_ = None
     
-    def fit(self, X, y=None):
-        """
-        Identifica las variables para las cuales calcular percentiles.
-        
-        Parameters:
-        -----------
-        X : pd.DataFrame
-            DataFrame de entrada
-        y : ignored
-            No utilizado, presente por compatibilidad con API de sklearn
+    def _calculate_percentile_for_group(self, series):
+            v = series.values
             
-        Returns:
-        --------
-        self
-        """
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-        
-        # Verificar que existe la columna foto_mes
-        if 'foto_mes' not in X.columns:
-            raise ValueError("El DataFrame debe contener la columna 'foto_mes'")
+            # Máscaras separadas
+            mask_nan = np.isnan(v)
+            mask_zero = (v == 0)
+            mask_pos = (v > 0)
+            mask_neg = (v < 0)
+            result = np.zeros_like(v, dtype=np.float32)
             
-        # Seleccionar variables si no se especificaron
-        if self.variables is None:
-            self.selected_variables_ = [
-                col for col in X.columns 
-                if col not in self.exclude_cols]
-        else:
-            # Verificar que todas las variables existen
-            missing_cols = set(self.variables) - set(X.columns)
-            if missing_cols:
-                raise ValueError(f"Las siguientes variables no existen en X: {missing_cols}")
-            self.selected_variables_ = list(self.variables)
-        
-        return self
-    
-    def _calculate_percentile(self, values):
-        """
-        Calcula percentiles continuos con manejo de ceros y negativos.
-        Parameters:
-        -----------
-        values : np.ndarray
-            Array de valores a transformar
+            # Positivos
+            if mask_pos.any():
+                pos_values = v[mask_pos]
+                
+                # rank sin nans
+                ranks = stats.rankdata(pos_values, method='min')
+                if len(pos_values) > 1:
+                    percentiles = (ranks - 1) / (len(pos_values) - 1) * 100
+                else:
+                    percentiles = np.array([50.0])
+                
+                result[mask_pos] = percentiles.astype(np.float32)
             
-        Returns:
-        --------
-        np.ndarray
-            Array de percentiles (float32)
-        """
-        n = len(values)
-        if n == 0:
-            return np.array([], dtype=np.float32)
-        
-        # Inicializar resultado con ceros
-        result = np.zeros(n, dtype=np.float32)        
-        # Separar positivos y negativos, los 0 quedan como estan
-        pos_mask = values > 0
-        neg_mask = values < 0
-        
-        # Procesar valores positivos
-        if pos_mask.any():
-            pos_values = values[pos_mask]
-            pos_ranks = stats.rankdata(pos_values, method='min')
-            # Calcular percentiles (0-100)
-            if len(pos_values) > 1:
-                pos_percentiles = (pos_ranks - 1) / (len(pos_values) - 1) * 100
-            else:
-                pos_percentiles = np.array([50.0])
-            result[pos_mask] = pos_percentiles.astype(np.float32)
-        
-        # Procesar valores negativos
-        if neg_mask.any():
-            neg_values = np.abs(values[neg_mask])
-            neg_ranks = stats.rankdata(neg_values, method='min')
-            # Calcular percentiles y aplicar signo negativo
-            if len(neg_values) > 1:
-                neg_percentiles = (neg_ranks - 1) / (len(neg_values) - 1) * 100
-            else:
-                neg_percentiles = np.array([50.0])
-            result[neg_mask] = -neg_percentiles.astype(np.float32)
-        
-        return result
+            # Negativos
+            if mask_neg.any():
+                neg_values = np.abs(v[mask_neg])
+                
+                ranks = stats.rankdata(neg_values, method='min')
+                if len(neg_values) > 1:
+                    percentiles = (ranks - 1) / (len(neg_values) - 1) * 100
+                else:
+                    percentiles = np.array([50.0])
+                
+                result[mask_neg] = -percentiles.astype(np.float32)
+            
+            result[mask_zero] = 0.0
+            result[mask_nan] = np.nan
+            
+            return pd.Series(result, index=series.index)
     
     
     def _transform(self, X):
-        
-        def calculate_percentile_for_group(series):
-            """
-            Calcula percentiles para un mes específico.
-            - 0 permanece como 0
-            - Positivos se rankean entre sí (0-100)
-            - Negativos se rankean usando valor absoluto y se aplica signo negativo (-100 a 0)
-            """
-            v = series.values
-            
-            # Máscaras separadas
-            mask_nan = np.isnan(v)
-            mask_zero = (v == 0)
-            mask_pos = (v > 0)
-            mask_neg = (v < 0)
-            
-            # Inicializar resultado
-            result = np.zeros_like(v, dtype=np.float32)
-            
-            # === Positivos ===
-            if mask_pos.any():
-                pos_values = v[mask_pos]
-                
-                # rank sin nans
-                ranks = stats.rankdata(pos_values, method='min')
-                if len(pos_values) > 1:
-                    percentiles = (ranks - 1) / (len(pos_values) - 1) * 100
-                else:
-                    percentiles = np.array([50.0])
-                
-                result[mask_pos] = percentiles.astype(np.float32)
-            
-            # === Negativos ===
-            if mask_neg.any():
-                neg_values = np.abs(v[mask_neg])
-                
-                ranks = stats.rankdata(neg_values, method='min')
-                if len(neg_values) > 1:
-                    percentiles = (ranks - 1) / (len(neg_values) - 1) * 100
-                else:
-                    percentiles = np.array([50.0])
-                
-                result[mask_neg] = -percentiles.astype(np.float32)
-            
-            # === Restituir ceros ===
-            result[mask_zero] = 0.0
-            
-            # === Restituir NaNs ===
-            result[mask_nan] = np.nan
-            
-            return pd.Series(result, index=series.index)
-        
-        # Procesar cada columna, agrupando por foto_mes
-        for col in self.selected_variables_:
+
+        if self.variables is None:
+            selected_variables = [
+                col for col in X.columns 
+                if col not in self.exclude_cols]
+        else:
+
+            missing_cols = set(self.variables) - set(X.columns)
+            if missing_cols:
+                raise ValueError(f"Las siguientes variables no existen en X: {missing_cols}")
+            selected_variables = list(self.variables)
+
+        for col in selected_variables:
             # Agrupar por foto_mes y aplicar la transformación de percentiles
-            X[col] = X.groupby('foto_mes')[col].transform(calculate_percentile_for_group)
+            X[col] = X.groupby('foto_mes')[col].transform(self._calculate_percentile_for_group)
         
         return X
-    
-    def _transform_parallel_by_column(self, X, n_jobs):
-        """
-        Paraleliza por columna: procesa cada columna en paralelo.
-        Cada columna se transforma independientemente, lo que permite un buen paralelismo.
-        """
-        if 'foto_mes' not in X.columns:
-            raise ValueError("El DataFrame debe contener la columna 'foto_mes'")
-        
-        logger.info(f"Paralelizando por columna: {len(self.selected_variables_)} columnas a procesar con {n_jobs} jobs")
-        
-        X_copy = X.copy()
-        
-        def calculate_percentile_for_group(series):
-            """
-            Calcula percentiles para un mes específico.
-            - 0 permanece como 0
-            - Positivos se rankean entre sí (0-100)
-            - Negativos se rankean usando valor absoluto y se aplica signo negativo (-100 a 0)
-            """
-            v = series.values
-            
-            # Máscaras separadas
-            mask_nan = np.isnan(v)
-            mask_zero = (v == 0)
-            mask_pos = (v > 0)
-            mask_neg = (v < 0)
-            
-            # Inicializar resultado
-            result = np.zeros_like(v, dtype=np.float32)
-            
-            # === Positivos ===
-            if mask_pos.any():
-                pos_values = v[mask_pos]
-                
-                # rank sin nans
-                ranks = stats.rankdata(pos_values, method='min')
-                if len(pos_values) > 1:
-                    percentiles = (ranks - 1) / (len(pos_values) - 1) * 100
-                else:
-                    percentiles = np.array([50.0])
-                
-                result[mask_pos] = percentiles.astype(np.float32)
-            
-            # === Negativos ===
-            if mask_neg.any():
-                neg_values = np.abs(v[mask_neg])
-                
-                ranks = stats.rankdata(neg_values, method='min')
-                if len(neg_values) > 1:
-                    percentiles = (ranks - 1) / (len(neg_values) - 1) * 100
-                else:
-                    percentiles = np.array([50.0])
-                
-                result[mask_neg] = -percentiles.astype(np.float32)
-            
-            # === Restituir ceros ===
-            result[mask_zero] = 0.0
-            
-            # === Restituir NaNs ===
-            result[mask_nan] = np.nan
-            
-            return pd.Series(result, index=series.index)
-        
-        # Función para procesar una sola columna
-        def process_column(col):
-            # Agrupar por foto_mes y aplicar la transformación de percentiles
-            return X_copy.groupby('foto_mes')[col].transform(calculate_percentile_for_group)
-        
-        # Procesar columnas en paralelo
-        results = Parallel(n_jobs=n_jobs)(
-            delayed(process_column)(col) for col in self.selected_variables_
-        )
-        
-        # Asignar resultados a X_copy
-        for col, result_series in zip(self.selected_variables_, results):
-            X_copy[col] = result_series
-        
-        return X_copy
     
 
 class LagTransformer(BaseTransformer):
@@ -473,31 +304,7 @@ class LagTransformer(BaseTransformer):
             Columnas a excluir del cálculo de lags. Si None, usa EXCLUDE_COLS
         """
         self.n_lags = n_lags
-        self.lag_columns_ = None
         self.exclude_cols = exclude_cols
-    def fit(self, X, y=None):
-        """
-        Identifica las columnas para las cuales calcular lags.
-        
-        Parameters:
-        -----------
-        X : pd.DataFrame
-            DataFrame de entrada
-        y : ignored
-            No utilizado, presente por compatibilidad con API de sklearn
-            
-        Returns:
-        --------
-        self
-        """
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-            
-        # Identificar columnas numéricas para calcular lags (excluir categóricas)
-        self.lag_columns_ = [col for col in X.columns 
-                            if col not in self.exclude_cols and col not in ALL_CAT_COLS]
-        
-        return self
     
     def _transform(self, X):
         """
@@ -513,17 +320,18 @@ class LagTransformer(BaseTransformer):
         pd.DataFrame
             DataFrame con las nuevas columnas de lags
         """
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-            
         X_transformed = X
+        
+        # Identificar columnas numéricas para calcular lags (excluir categóricas)
+        lag_columns = [col for col in X_transformed.columns 
+                      if col not in self.exclude_cols and col not in ALL_CAT_COLS]
         
         # Preparar lista de nuevas columnas para concatenar
         new_columns = []
         
         # Calcular lags para cada columna
         for lag in range(1, self.n_lags + 1):
-            for col in self.lag_columns_:
+            for col in lag_columns:
                 if col in X_transformed.columns:
                     # Calcular lag agrupado por cliente
                     lag_col_name = f'{col}_lag{lag}'
@@ -536,6 +344,7 @@ class LagTransformer(BaseTransformer):
             X_transformed = pd.concat([X_transformed] + new_columns, axis=1)
         
         return X_transformed
+
 
 class DeltaTransformer(BaseTransformer):
     """
@@ -554,31 +363,6 @@ class DeltaTransformer(BaseTransformer):
         """
         self.n_deltas = n_deltas
         self.exclude_cols = exclude_cols
-        self.delta_columns_ = None
-        
-    def fit(self, X, y=None):
-        """
-        Identifica las columnas para las cuales calcular deltas.
-        
-        Parameters:
-        -----------
-        X : pd.DataFrame
-            DataFrame de entrada
-        y : ignored
-            No utilizado, presente por compatibilidad con API de sklearn
-            
-        Returns:
-        --------
-        self
-        """
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-            
-        # Identificar columnas numéricas para calcular deltas (excluir categóricas)
-        self.delta_columns_ = [col for col in X.columns 
-                              if col not in self.exclude_cols and col not in ALL_CAT_COLS]
-        
-        return self
     
     def _transform(self, X_transformed):
         """
@@ -594,16 +378,16 @@ class DeltaTransformer(BaseTransformer):
         pd.DataFrame
             DataFrame con las nuevas columnas de deltas
         """
-        if not isinstance(X_transformed, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-
+        # Identificar columnas numéricas para calcular deltas (excluir categóricas)
+        delta_columns = [col for col in X_transformed.columns 
+                        if col not in self.exclude_cols and col not in ALL_CAT_COLS]
         
         # Preparar lista de nuevas columnas para concatenar
         new_columns = []
         
         # Calcular deltas para cada columna
         for delta in range(1, self.n_deltas + 1):
-            for col in self.delta_columns_:
+            for col in delta_columns:
                 if col in X_transformed.columns:
                     # Calcular delta agrupado por cliente
                     delta_col_name = f'{col}_delta{delta}'
@@ -620,6 +404,7 @@ class DeltaTransformer(BaseTransformer):
             X_transformed = pd.concat([X_transformed] + new_columns, axis=1)
         
         return X_transformed
+
 
 class DeltaLagTransformer(BaseTransformer):
     """
@@ -640,44 +425,23 @@ class DeltaLagTransformer(BaseTransformer):
         self.exclude_cols = exclude_cols if exclude_cols is not None else [
             "foto_mes", "numero_de_cliente", "target", "label", "weight"
         ]
-        self.feature_columns_ = None
-    
-    def fit(self, X, y=None):
-        """Identifica las columnas para procesar"""
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-        
-        if "clase_ternaria" in X.columns:
-            raise ValueError("La columna 'clase_ternaria' no debe estar en el dataset")
-        
-        # Verificar columnas requeridas
-        if 'numero_de_cliente' not in X.columns:
-            raise ValueError("El DataFrame debe contener 'numero_de_cliente'")
-        
-        # Identificar columnas a procesar
-        self.feature_columns_ = [
-            col for col in X.columns 
-            if col not in self.exclude_cols and col not in ALL_CAT_COLS
-        ]
-        
-        return self
     
     def _transform(self, X):
         """
         Aplica transformación optimizada de lags y deltas.
         """
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-        
-        if self.feature_columns_ is None:
-            raise ValueError("El transformador no ha sido ajustado. Llame a fit() primero.")
+        # Identificar columnas a procesar
+        feature_columns = [
+            col for col in X.columns 
+            if col not in self.exclude_cols and col not in ALL_CAT_COLS
+        ]
         
         # Ordenar por cliente (asegura que shift funcione correctamente)
         # Pandas groupby.shift ya maneja esto internamente, pero lo hacemos explícito
         X_sorted = X.sort_values(['numero_de_cliente', 'foto_mes'])
         
         # Obtener solo las columnas a procesar
-        cols_to_process = [col for col in self.feature_columns_ if col in X_sorted.columns]
+        cols_to_process = [col for col in feature_columns if col in X_sorted.columns]
         
         if not cols_to_process:
             return X
@@ -727,9 +491,6 @@ class PeriodStatsTransformer(BaseTransformer):
         self.periods = periods
         self.exclude_cols = exclude_cols
     
-    def fit(self, X, y=None):
-        return self
-    
     def _transform(self, X):
 
         numeric_cols = [col for col in X.select_dtypes(include='number').columns if col not in self.exclude_cols and col.startswith('m')]
@@ -756,72 +517,6 @@ class PeriodStatsTransformer(BaseTransformer):
         
         return X
 
-class LegacyTendencyTransformer(BaseTransformer):
-    """
-    Calcula la pendiente de regresión lineal de cada variable numérica para cada cliente.
-    Usa una expanding window: para cada mes, calcula la tendencia usando todos los datos históricos.
-    """
-    def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
-        self.exclude_cols = exclude_cols
-        self.numeric_cols_ = None
-    
-    def fit(self, X, y=None):
-        """Identifica las columnas numéricas para calcular tendencias."""
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-        
-        self.numeric_cols_ = [col for col in X.columns 
-                             if col not in self.exclude_cols and col not in ALL_CAT_COLS and col.startswith('m')]
-        return self
-    
-    def _transform(self, X):
-        """Calcula la pendiente de regresión lineal para cada variable y cliente."""
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-        
-        X_transformed = X
-        X_transformed = X_transformed.sort_values(['numero_de_cliente', 'foto_mes'])
-        
-        # Función para calcular pendiente usando fórmula de mínimos cuadrados
-        def calculate_slope(series):
-            valid_mask = series.notna()
-            if valid_mask.sum() < 2:
-                return np.nan
-            
-            y = series[valid_mask].values
-            x = np.arange(len(y))
-            
-            # Fórmula de mínimos cuadrados: slope = (n*sum(xy) - sum(x)*sum(y)) / (n*sum(x^2) - sum(x)^2)
-            n = len(x)
-            sum_x = x.sum()
-            sum_y = y.sum()
-            sum_xy = (x * y).sum()
-            sum_x2 = (x * x).sum()
-            
-            denominator = n * sum_x2 - sum_x * sum_x
-            if denominator == 0:
-                return 0.0
-            
-            slope = (n * sum_xy - sum_x * sum_y) / denominator
-            return slope
-        
-        # Calcular pendiente para cada variable numérica
-        new_columns = []
-        for col in self.numeric_cols_:
-            if col in X_transformed.columns:
-                # Usar expanding para calcular la pendiente con todos los datos históricos
-                slope_col = X_transformed.groupby('numero_de_cliente')[col].expanding().apply(
-                    calculate_slope, raw=False
-                ).reset_index(level=0, drop=True)
-                
-                slope_col.name = f'{col}_tendency'
-                new_columns.append(slope_col)
-
-        # Concatenar todas las nuevas columnas
-        if new_columns:
-            X_transformed = pd.concat([X_transformed] + new_columns, axis=1)
-        
-        return X_transformed
 
 class TendencyTransformer(BaseTransformer):
     """
@@ -829,31 +524,23 @@ class TendencyTransformer(BaseTransformer):
     """
     def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"], window=6):
         self.exclude_cols = exclude_cols
-        self.numeric_cols_ = None
         self.window = window
 
-    def fit(self, X, y=None):
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-
-        self.numeric_cols_ = [
-            col for col in X.columns
-            if col not in self.exclude_cols and col not in ALL_CAT_COLS and col.startswith('m')
-        ]
-        return self
-
     def _transform(self, X):
-        if not isinstance(X, pd.DataFrame):
-            raise ValueError("X debe ser un pandas DataFrame")
-
         X = X.sort_values(['numero_de_cliente', 'foto_mes'])
         clientes = X['numero_de_cliente'].values
         new_cols = {}
+        
+        # Identificar columnas numéricas para calcular tendencias
+        numeric_cols = [
+            col for col in X.columns
+            if col not in self.exclude_cols and col not in ALL_CAT_COLS and col.startswith('m')
+        ]
 
         # identificar cortes por cliente (para procesar cada bloque como un array contiguo)
         _, start_idx, counts = np.unique(clientes, return_index=True, return_counts=True)
 
-        for col in self.numeric_cols_:
+        for col in numeric_cols:
             y_all = X[col].values.astype(float)
             slope = np.full_like(y_all, np.nan, dtype=float)
 
@@ -897,13 +584,11 @@ class TendencyTransformer(BaseTransformer):
         X_out = X.assign(**new_cols)
         return X_out
 
+
 class IntraMonthTransformer(BaseTransformer):
 
     def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         self.exclude_cols = exclude_cols
-    
-    def fit(self, X, y=None):
-        return self
     
     def _transform(self, X):
         X_transformed = X
@@ -929,6 +614,7 @@ class IntraMonthTransformer(BaseTransformer):
         
         return X_transformed
 
+
 class HistoricalFeaturesTransformer(BaseTransformer):
     """
     Transformer que genera features históricos basados en datos de meses anteriores.
@@ -936,11 +622,6 @@ class HistoricalFeaturesTransformer(BaseTransformer):
     """
     def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         self.exclude_cols = exclude_cols
-
-    def fit(self, X, y=None):
-        if "clase_ternaria" in X.columns:
-            raise ValueError("La columna 'clase_ternaria' no debe estar en el dataset")
-        return self
 
     def _transform(self, X):
         X_transformed = X
@@ -1006,12 +687,10 @@ class HistoricalFeaturesTransformer(BaseTransformer):
         
         return X_transformed
 
+
 class DatesTransformer(BaseTransformer):
     def __init__(self, exclude_cols=["foto_mes", "numero_de_cliente", "target", "label", "weight"]):
         self.exclude_cols = exclude_cols
-
-    def fit(self, X, y=None):
-        return self
     
     def _transform(self, X):
         X_transformed = X
@@ -1022,12 +701,12 @@ class DatesTransformer(BaseTransformer):
 
         return X_transformed
 
+
 class RandomForestFeaturesTransformer(BaseTransformer):
-    def __init__(self, exclude_cols=["numero_de_cliente", "label", "weight", "clase_ternaria", "target"], n_estimators=20, num_leaves=16, min_data_in_leaf=100, feature_fraction_bynode=0.2, training_months= [], use_zero_shot=False):
+    def __init__(self, exclude_cols=["numero_de_cliente", "label", "weight", "clase_ternaria", "target"], n_estimators=20, num_leaves=16, min_data_in_leaf=100, feature_fraction_bynode=0.2, training_months= []):
         self.exclude_cols = exclude_cols
         self.training_months = training_months  
         self.n_estimators = n_estimators
-        self.use_zero_shot = use_zero_shot
         self.lgb_params = {
             "num_iterations": n_estimators,
             "num_leaves": num_leaves,
@@ -1067,17 +746,6 @@ class RandomForestFeaturesTransformer(BaseTransformer):
         self.keep_cols = [col for col in X_train.columns if col not in self.exclude_cols]
         X_train = X_train[self.keep_cols]
         self.columns_ = X_train.columns
-        
-        if self.use_zero_shot:
-            (
-            hp,
-            estimator_class,
-            X_transformed,
-            y_transformed,
-            feature_transformer,
-            label_transformer,
-            ) = preprocess_and_suggest_hyperparams("classification", X, y, "rf")
-            self.lgb_params.update({"num_iterations": hp["n_estimators"], "num_leaves": hp["max_leaf_nodes"], "feature_fraction": hp["max_features"]})
         dtrain = lgb.Dataset(
         data=X_train.values,
         label=y,
@@ -1114,12 +782,11 @@ class RandomForestFeaturesTransformer(BaseTransformer):
             X = pd.concat([X, extra_cols], axis=1)
         
         return X
+
+
 class AddCanaritos(BaseTransformer):
     def __init__(self, n_canaritos=10):
         self.n_canaritos = n_canaritos
-
-    def fit(self, X, y=None):
-        return self
 
     def _transform(self, X):
         X_transformed = X

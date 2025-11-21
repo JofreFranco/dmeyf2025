@@ -13,47 +13,19 @@ from dmeyf2025.processors.feature_processors import AddCanaritos
 
 pd.set_option('display.max_columns', None)
 
-def setup_logger(log_file="/home/martin232009/buckets/b1/experiment.log"):
+# Logger del módulo - heredará configuración del root logger
+logger = logging.getLogger(__name__)
 
-    logger = logging.getLogger("main")
-    logger.setLevel(logging.INFO)
-
-    # Evitar duplicados
-    if logger.handlers:
-        return logger
-
-    formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(message)s"
-    )
-
-    # ---- File handler ----
-    try:
-        fh = logging.FileHandler(log_file, mode="a")
-        fh.setLevel(logging.INFO)
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
-        print(f"[LOG] FileHandler creado OK en: {log_file}")
-    except Exception as e:
-        print(f"[ERROR] FileHandler falló: {e}")
-
-    # ---- Console handler ----
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-
-    return logger
-logger = setup_logger()
 def memory_gb(df: pd.DataFrame) -> float:
     return df.memory_usage().sum() / (1024 ** 3)
 
-def apply_transformer(transformer, X, name: str, logger, VERBOSE=False, parallel=False, parallelize_by='foto_mes', n_jobs=-1):
+def apply_transformer(transformer, X, name: str, VERBOSE=False, parallel=False, parallelize_by='foto_mes', n_jobs=-1):
     logger.info(f"[{name}] Iniciando…")
 
     start_mem = memory_gb(X)
     start_time = time.time()
 
-    Xt = transformer.fit_transform(X, parallel=parallel, parallelize_by=parallelize_by, n_jobs=n_jobs)
+    Xt = transformer.transform(X, parallel=parallel, parallelize_by=parallelize_by, n_jobs=n_jobs)
 
     end_time = time.time()
     end_mem = memory_gb(Xt)
@@ -126,7 +98,8 @@ def print_memory_state():
         logger.info(f"Sistema RAM: {mem.percent:.1f}% usado, {mem.available / (1024**3):.2f} GB disponibles, total {mem.total / (1024**3):.2f} GB")
     except Exception as e:
         logger.warning(f"No se pudo leer estado de la RAM: {e}")
-def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames):
+
+def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames, bucket_path):
     revs = []
     for seed in seeds[:n_seeds]:
         params["seed"] = seed
@@ -135,7 +108,7 @@ def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, resul
         model = train_model(train_set, params)
         y_pred = model.predict(X_eval)
         if save_model:
-            joblib.dump(model, f"/home/martin232009/buckets/b1/models/{experiment_name}_{seed}.pkl")
+            joblib.dump(model, f"{bucket_path}models/{experiment_name}_{seed}.pkl")
             save_model = False
         rev, _ = gan_eval(y_pred, w_eval, window=2001)
         revs.append(rev)
@@ -206,59 +179,48 @@ def identify_low_importance_features(
     
     logger.info(f"Parámetros del modelo: {params}")
     
-    # Paso 1: Agregar canaritos
+    # Agregar canaritos
     logger.info(f"\n📊 Agregando {n_canaritos} canaritos al dataset...")
     canaritos_transformer = AddCanaritos(n_canaritos=n_canaritos)
     
-    # Identificar columnas que no son features (para preservarlas)
     exclude_cols = ['foto_mes', 'numero_de_cliente', 'target', 'label', 'weight', 'clase_ternaria']
     feature_cols = [col for col in X_train.columns if col not in exclude_cols]
     
     logger.info(f"Features originales: {len(feature_cols)}")
     
-    # Aplicar transformación de canaritos
-    X_train_with_canaritos = canaritos_transformer.fit_transform(X_train)
-    
-    # Identificar los nombres de los canaritos
+    X_train_with_canaritos = canaritos_transformer.transform(X_train)
     canaritos_names = [col for col in X_train_with_canaritos.columns if col.startswith('canarito_')]
     logger.info(f"Canaritos agregados: {canaritos_names}")
     
-    # Separar features para entrenar (sin columnas de identificación)
     X_train_features = X_train_with_canaritos[[col for col in X_train_with_canaritos.columns if col not in exclude_cols]]
     
     logger.info(f"Total de features para entrenar (incluyendo canaritos): {len(X_train_features.columns)}")
-    
-    # Paso 2: Crear dataset de LightGBM
-    logger.info("\n🏋️ Creando dataset de LightGBM...")
+    logger.info("\nCreando dataset de LightGBM...")
     train_set = lgb.Dataset(
         data=X_train_features,
         label=y_train,
         free_raw_data=False
     )
     
-    # Paso 3: Entrenar modelo
-    logger.info("\n🚀 Entrenando modelo LightGBM...")
+    logger.info("\nEntrenando modelo LightGBM...")
     start_time = time.time()
     model = train_model(train_set, params)
     training_time = time.time() - start_time
     logger.info(f"✅ Modelo entrenado en {training_time:.2f} segundos")
     logger.info(f"Número de árboles: {model.num_trees()}")
     
-    # Paso 4: Obtener importancia de features
+    # Obtener importancia de features
     logger.info("\n📈 Calculando importancia de features...")
     feature_names = model.feature_name()
     feature_importance = model.feature_importance(importance_type='gain')
     
-    # Crear DataFrame con importancias
     importance_df = pd.DataFrame({
         'feature': feature_names,
         'importance': feature_importance
     })
     
-    # Separar canaritos de features reales
     importance_df['is_canarito'] = importance_df['feature'].str.startswith('canarito_')
     
-    # Calcular estadísticas de canaritos
     canaritos_importance = importance_df[importance_df['is_canarito']]['importance']
     canaritos_avg = canaritos_importance.mean()
     canaritos_median = canaritos_importance.median()
