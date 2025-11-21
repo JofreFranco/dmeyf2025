@@ -7,9 +7,6 @@ import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import resample
 
-
-
-
 logger = logging.getLogger(__name__)
 
 

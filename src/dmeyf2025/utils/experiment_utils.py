@@ -95,7 +95,7 @@ def print_memory_state():
     except Exception as e:
         logger.warning(f"No se pudo leer estado de la RAM: {e}")
 
-def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames, bucket_path):
+def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames, bucket_path, debug_mode=False):
     revs = []
     for seed in seeds[:n_seeds]:
         params["seed"] = seed
@@ -108,10 +108,11 @@ def train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, resul
             save_model = False
         rev, _ = gan_eval(y_pred, w_eval, window=2001)
         revs.append(rev)
-        if rev > 600000000:
-            raise Exception(f"Ganancia excesiva: {rev}")
-        if rev < 350000000:
-            raise Exception(f"Ganancia insuficiente: {rev}")
+        if not debug_mode:
+            if rev > 600000000:
+                raise Exception(f"Ganancia excesiva: {rev}")
+            if rev < 350000000:
+                raise Exception(f"Ganancia insuficiente: {rev}")
 
         write_header = not os.path.exists(results_file)
         

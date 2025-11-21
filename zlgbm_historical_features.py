@@ -16,8 +16,8 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(),
-        logging.StreamHandler()  # También muestra en consola
+        logging.FileHandler(experiment_log_file),
+        logging.StreamHandler()
     ],
     force=True
 )
@@ -108,4 +108,4 @@ logger.info("Datos pre procesados en tiempo: %s", time.time() - start_time)
 
 train_set = lgb.Dataset(X_train, label=y_train)
 
-revs = train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames)
+revs = train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames, bucket_path, debug_mode)

@@ -224,3 +224,5 @@ experiments/
 #results
 results/
 *.pkl
+results.csv
+experiment.log
