@@ -2,16 +2,13 @@ import pandas as pd
 from scipy import stats
 import numpy as np
 import lightgbm as lgb
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import OneHotEncoder
-from flaml.default import preprocess_and_suggest_hyperparams
 from joblib import Parallel, delayed
 
 from ..utils.data_dict import ALL_CAT_COLS, EXCLUDE_COLS
 
 import logging
 logger = logging.getLogger(__name__)
-# Función para calcular percentiles con la lógica especial
+# Función para calcular percentiles
 def calculate_percentile_with_sign(group, n_bins=None):
     # Inicializar con NaN
     result = pd.Series(np.nan, index=group.index)
@@ -33,7 +30,7 @@ def calculate_percentile_with_sign(group, n_bins=None):
         else:
             result[pos_mask] = pos_percentiles
     return result
-class BaseTransformer(BaseEstimator, TransformerMixin):
+class BaseTransformer():
     def fit(self, X, y=None):
         return self
     
@@ -158,9 +155,6 @@ class CleanZerosTransformer(BaseTransformer):
     """
     Detecta pares de variables cVARIABLE (cantidad) y mVARIABLE (monto).
     Cuando la cantidad es 0, pone el monto en None en lugar de 0.
-    
-    Esto evita que el modelo aprenda relaciones incorrectas donde hay montos
-    en 0 que en realidad deberían ser valores nulos (porque no existe la operación).
 
     Además limpia el mes 202006 que tiene muchas variables rotas en 0, se pasan a Nan y también se limpia la variable de mobile app que se invirtió, poniendo antes de la inversión todo en Nan
     """
@@ -201,10 +195,7 @@ class CleanZerosTransformer(BaseTransformer):
         # Para cada par detectado, limpiar los montos cuando cantidad = 0
         for c_col, m_col in self.variable_pairs_:
             if c_col in X_transformed.columns and m_col in X_transformed.columns:
-                # Crear máscara donde la cantidad es 0
                 zero_mask = X_transformed[c_col] == 0
-                
-                # Poner el monto en None donde la cantidad es 0
                 X_transformed.loc[zero_mask, m_col] = np.nan
         
         # Limpiar antes del mes 202010 tmobile_app
@@ -227,19 +218,13 @@ class PercentileTransformer(BaseTransformer):
     
     def __init__(self, variables=None, exclude_cols=None, replace_original=True):
         """
-        Aplica la transformación de percentiles continuos.
-        Para cada mes y cada variable:
-        - El 0 permanece como 0
-        - Los valores positivos se rankean entre sí (0-100)
-        - Los valores negativos se rankean usando su valor absoluto y se les aplica signo negativo (-100 a 0)
-        
         Parameters:
         -----------
         variables : list, optional
             Lista de variables para calcular percentiles. Si None, usa todas las numéricas
         exclude_cols : list, optional
             Columnas a excluir. Si None, usa ["foto_mes", "numero_de_cliente", "target", "label", "weight"]
-        replace_original : bool, default=False
+        replace_original : bool, default=True
             Si True, reemplaza las columnas originales con los percentiles.
             Si False, crea nuevas columnas con sufijo '_percentile'
         """
