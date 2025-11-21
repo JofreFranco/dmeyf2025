@@ -309,7 +309,7 @@ class LagTransformer(BaseTransformer):
     "active_quarter",
     "clase_ternaria",
     'Visa_fechaalta',
-    'Master_fechaalta']):
+    'Master_fechaalta'], add_exclude_cols=[]):
         """
         Parameters:
         -----------
@@ -319,7 +319,7 @@ class LagTransformer(BaseTransformer):
             Columnas a excluir del cálculo de lags. Si None, usa EXCLUDE_COLS
         """
         self.n_lags = n_lags
-        self.exclude_cols = exclude_cols
+        self.exclude_cols = exclude_cols + add_exclude_cols
     
     def _transform(self, X):
         """
@@ -376,7 +376,7 @@ class DeltaTransformer(BaseTransformer):
     "active_quarter",
     "clase_ternaria",
     'Visa_fechaalta',
-    'Master_fechaalta']):
+    'Master_fechaalta'], add_exclude_cols=[]):
         """
         Parameters:
         -----------
@@ -386,7 +386,7 @@ class DeltaTransformer(BaseTransformer):
             Columnas a excluir del cálculo de deltas. Si None, usa EXCLUDE_COLS
         """
         self.n_deltas = n_deltas
-        self.exclude_cols = exclude_cols
+        self.exclude_cols = exclude_cols + add_exclude_cols
     
     def _transform(self, X_transformed):
         """
@@ -445,7 +445,7 @@ class DeltaLagTransformer(BaseTransformer):
     "active_quarter",
     "clase_ternaria",
     'Visa_fechaalta',
-    'Master_fechaalta']):
+    'Master_fechaalta'], add_exclude_cols=[]):
         """
         Parameters:
         -----------
@@ -455,7 +455,7 @@ class DeltaLagTransformer(BaseTransformer):
             Columnas a excluir del cálculo
         """
         self.n_lags = n_lags
-        self.exclude_cols = exclude_cols
+        self.exclude_cols = exclude_cols + add_exclude_cols
     
     def _transform(self, X):
         """
@@ -527,9 +527,9 @@ class PeriodStatsTransformer(BaseTransformer):
     "active_quarter",
     "clase_ternaria",
     'Visa_fechaalta',
-    'Master_fechaalta']):
+    'Master_fechaalta'], add_exclude_cols=[]):
         self.periods = periods
-        self.exclude_cols = exclude_cols
+        self.exclude_cols = exclude_cols + add_exclude_cols
     
     def _transform(self, X):
 
@@ -571,8 +571,8 @@ class TendencyTransformer(BaseTransformer):
     "active_quarter",
     "clase_ternaria",
     'Visa_fechaalta',
-    'Master_fechaalta'], window=6):
-        self.exclude_cols = exclude_cols
+    'Master_fechaalta'], window=6, add_exclude_cols=[]):
+        self.exclude_cols = exclude_cols + add_exclude_cols
         self.window = window
 
     def _transform(self, X):
@@ -645,8 +645,8 @@ class IntraMonthTransformer(BaseTransformer):
     "active_quarter",
     "clase_ternaria",
     'Visa_fechaalta',
-    'Master_fechaalta']):
-        self.exclude_cols = exclude_cols
+    'Master_fechaalta'], add_exclude_cols=[]):
+        self.exclude_cols = exclude_cols + add_exclude_cols
     
     def _transform(self, X):
         X_transformed = X
@@ -687,8 +687,8 @@ class HistoricalFeaturesTransformer(BaseTransformer):
     "active_quarter",
     "clase_ternaria",
     'Visa_fechaalta',
-    'Master_fechaalta']):
-        self.exclude_cols = exclude_cols
+    'Master_fechaalta'], add_exclude_cols=[]):
+        self.exclude_cols = exclude_cols + add_exclude_cols
 
     def _transform(self, X):
         X_transformed = X
@@ -765,8 +765,8 @@ class DatesTransformer(BaseTransformer):
     "active_quarter",
     "clase_ternaria",
     'Visa_fechaalta',
-    'Master_fechaalta']):
-        self.exclude_cols = exclude_cols
+    'Master_fechaalta'], add_exclude_cols=[]):
+        self.exclude_cols = exclude_cols + add_exclude_cols
     
     def _transform(self, X):
         X_transformed = X
@@ -869,8 +869,8 @@ class RatioLagsTransformer(BaseTransformer):
     "active_quarter",
     "clase_ternaria",
     'Visa_fechaalta',
-    'Master_fechaalta'], n_lags=2):
-        self.exclude_cols = exclude_cols
+    'Master_fechaalta'], n_lags=2, add_exclude_cols=[]):
+        self.exclude_cols = exclude_cols + add_exclude_cols
         self.n_lags = n_lags
     def _transform(self, X):
         X_transformed = X
@@ -888,8 +888,8 @@ class AvgRatioTransformer(BaseTransformer):
     "Visa_Finiciomora",
     "Master_delinquency",
     "Visa_delinquency",
-    "active_quarter", "clase_ternaria", 'Visa_fechaalta', 'Master_fechaalta'], months=3):
-        self.exclude_cols = exclude_cols
+    "active_quarter", "clase_ternaria", 'Visa_fechaalta', 'Master_fechaalta'], months=3, add_exclude_cols=[]):
+        self.exclude_cols = exclude_cols + add_exclude_cols 
         self.months = months
     
     def _transform(self, X):
@@ -907,23 +907,25 @@ class AvgRatioTransformer(BaseTransformer):
                 continue
             if pd.api.types.is_numeric_dtype(X_transformed[col]):
                 numeric_cols.append(col)
-        
-        # Calcular el promedio de los últimos  meses y el ratio para cada columna
+
+        ratio_cols = {}
+
         for col in numeric_cols:
-            avg_col_name = f"{col}_avg_{self.months}m"
-            X_transformed[avg_col_name] = (
+            avg_series = (
                 X_transformed.groupby("numero_de_cliente")[col]
                 .shift(1)
                 .rolling(window=self.months, min_periods=1)
                 .mean()
                 .reset_index(level=0, drop=True)
             )
-            
-            # Calcular el ratio variable/avg_variable
             ratio_col_name = f"{col}_avg_ratio_{self.months}m"
-            X_transformed[ratio_col_name] = X_transformed[col] / (X_transformed[avg_col_name] + np.finfo(float).eps)
-        
-        logger.info(f"AvgRatioTransformer: Se generaron {len(numeric_cols) * 2} columnas (promedios y ratios) para {self.months} meses")
+            ratio_cols[ratio_col_name] = X_transformed[col] / (avg_series + np.finfo(float).eps)
+
+        # Concatenar solo los ratios
+        ratio_df = pd.DataFrame(ratio_cols, index=X_transformed.index)
+        X_transformed = pd.concat([X_transformed, ratio_df], axis=1)
+
+        logger.info(f"AvgRatioTransformer: Se generaron {len(numeric_cols)} columnas (ratios) para {self.months} meses")
         
         return X_transformed
 

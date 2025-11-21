@@ -9,7 +9,6 @@ import csv
 import joblib
 import numpy as np
 from dmeyf2025.metrics import gan_eval
-from dmeyf2025.processors.feature_processors import AddCanaritos
 
 pd.set_option('display.max_columns', None)
 
@@ -154,6 +153,7 @@ def identify_low_importance_features(
     
     # Agregar canaritos
     logger.info(f"\n📊 Agregando {n_canaritos} canaritos al dataset...")
+    from dmeyf2025.processors.feature_processors import AddCanaritos
     canaritos_transformer = AddCanaritos(n_canaritos=n_canaritos)
     
     exclude_cols = ['foto_mes', 'numero_de_cliente', 'target', 'label', 'weight', 'clase_ternaria']
