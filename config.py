@@ -35,7 +35,7 @@ if debug_mode:
     params["gradient_bound"] = 0.4
     experiment_name += "_DEBUG"
     
-experiment_name = f"{experiment_name}_c{canaritos}_gb{experiment_name}_s{sampling_rate}_u{(params['is_unbalance'])}"
+
 # Agregar target y calcular weight
 weight = {"BAJA+1": 1, "BAJA+2": 1.00002, "CONTINUA": 1}
 
