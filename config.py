@@ -1,6 +1,7 @@
 debug_mode = True
 VERBOSE = False
 gcp = False
+user = "martin232009"
 experiment_name = "zlgbm-histfeatures"
 dataset_path = "data/competencia_01_target.csv"
 training_months = [201901, 201902, 201903, 201904, 201905, 201906, 201907, 201908,
@@ -39,10 +40,10 @@ experiment_name = f"{experiment_name}_c{canaritos}_gb{experiment_name}_s{samplin
 weight = {"BAJA+1": 1, "BAJA+2": 1.00002, "CONTINUA": 1}
 
 if gcp:
-    user = "martin232009"
+    
     bucket_path = f'/home/{user}/buckets/b1/'
     results_file = f"{bucket_path}results.csv"
-    experiment_log_file = f"{bucket_path}experiment.log"
+    experiment_log_file = f"{bucket_path}{experiment_name}.log"
 else:
     bucket_path = "data/"
     results_file = "results.csv"

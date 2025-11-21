@@ -8,7 +8,7 @@ import os
 import csv
 import joblib
 import numpy as np
-from dmeyf2025.metrics.revenue import gan_eval
+from dmeyf2025.metrics import gan_eval
 from dmeyf2025.processors.feature_processors import AddCanaritos
 
 pd.set_option('display.max_columns', None)
@@ -17,30 +17,6 @@ logger = logging.getLogger(__name__)
 
 def memory_gb(df: pd.DataFrame) -> float:
     return df.memory_usage().sum() / (1024 ** 3)
-
-def apply_transformer(transformer, X, name: str, parallel=False, parallelize_by='foto_mes', n_jobs=-1):
-    logger.info(f"[{name}] Iniciando…")
-
-    start_mem = memory_gb(X)
-    start_time = time.time()
-
-    Xt = transformer.transform(X, parallel=parallel, parallelize_by=parallelize_by, n_jobs=n_jobs)
-
-    end_time = time.time()
-    end_mem = memory_gb(Xt)
-
-    n_rows, n_cols = Xt.shape
-
-    logger.info(
-        f"[{name}] Tiempo: {end_time - start_time:.2f}s | "
-        f"Memoria antes: {start_mem:.3f} GB | "
-        f"Memoria después: {end_mem:.3f} GB | "
-        f"Diferencia: {end_mem - start_mem:+.3f} GB | "
-        f"Shape: {n_rows:,} filas × {n_cols:,} columnas"
-    )
-
-    gc.collect()
-    return Xt
 
 def train_model(train_set, params):
     """

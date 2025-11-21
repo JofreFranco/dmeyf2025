@@ -3,33 +3,39 @@ from scipy import stats
 import numpy as np
 import lightgbm as lgb
 from joblib import Parallel, delayed
-
+import time
+import gc
+from ..utils.experiment_utils import memory_gb
 from ..utils.data_dict import ALL_CAT_COLS, EXCLUDE_COLS
 
 import logging
 logger = logging.getLogger(__name__)
 # Función para calcular percentiles
-def calculate_percentile_with_sign(group, n_bins=None):
-    # Inicializar con NaN
-    result = pd.Series(np.nan, index=group.index)
-    
-    # Los ceros permanecen como 0
-    zero_mask = group == 0
-    result[zero_mask] = 0
-    
-    # Valores positivos
-    pos_mask = group > 0
-    if pos_mask.any():
-        pos_values = group[pos_mask]
-        # Calcular percentil rank (0-100)
-        pos_percentiles = pos_values.rank(pct=True, method='average') * 100
-        # Discretizar en saltos de n_bins
-        if n_bins is not None:
-            pos_percentiles_discrete = (pos_percentiles / n_bins).round() * n_bins
-            result[pos_mask] = pos_percentiles_discrete
-        else:
-            result[pos_mask] = pos_percentiles
-    return result
+
+def apply_transformer(transformer, X, name: str, parallel=False, parallelize_by='foto_mes', n_jobs=-1):
+    logger.info(f"[{name}] Iniciando…")
+
+    start_mem = memory_gb(X)
+    start_time = time.time()
+
+    Xt = transformer.transform(X, parallel=parallel, parallelize_by=parallelize_by, n_jobs=n_jobs)
+
+    end_time = time.time()
+    end_mem = memory_gb(Xt)
+
+    n_rows, n_cols = Xt.shape
+
+    logger.info(
+        f"[{name}] Tiempo: {end_time - start_time:.2f}s | "
+        f"Memoria antes: {start_mem:.3f} GB | "
+        f"Memoria después: {end_mem:.3f} GB | "
+        f"Diferencia: {end_mem - start_mem:+.3f} GB | "
+        f"Shape: {n_rows:,} filas × {n_cols:,} columnas"
+    )
+
+    gc.collect()
+    return Xt
+
 
 class BaseTransformer():
     def fit(self, X, y=None):
