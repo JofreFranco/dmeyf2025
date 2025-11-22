@@ -14,11 +14,7 @@ set +e
 
 # Array con los archivos Python a ejecutar
 archivos=(
-    "zlgbm_historical_features.py"
-    "zlgbm_historical_features_2.py"
-    "zlgbm_historical_ratio_lags.py"
-    "zlgbm_historical_features_sr_05.py"
-    "zlgbm_historical_features_2_sr_05.py"
+    "zlgbm_historical2_ratio_lags.py"
     # Agregar más archivos aquí según sea necesario
 )
 
@@ -66,5 +62,5 @@ echo "Presiona Ctrl+C para cancelar"
 sleep 10
 
 # Apagar el sistema (requiere permisos de sudo)
-#sudo shutdown -h now
+sudo shutdown -h now
 

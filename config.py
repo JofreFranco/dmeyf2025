@@ -1,9 +1,9 @@
-debug_mode = True
+debug_mode = False
 VERBOSE = False
 gcp = True
 user = "emicardosomartinez"
 experiment_name = "zlgbm-histfeatures"
-dataset_path = "data/competencia_01_target.csv"
+dataset_path = "dataset.csv"
 training_months = [201901, 201902, 201903, 201904, 201905, 201906, 201907, 201908,
        201909, 201910, 201911, 201912, 202001, 202002, 202003, 202004,
        202005, 202006, 202007, 202008, 202009, 202010, 202011, 202012,
@@ -19,7 +19,7 @@ fieldnames = ["experiment_name", "seed", "training_time", "moving_average_rev"]
 features_to_drop = ["cprestamos_prendarios", "mprestamos_prendarios", "cprestamos_personales", "mprestamos_personales"]
 canaritos = 5
 gradient_bound = 0.1
-n_seeds = 10
+n_seeds = 5
 min_data_in_leaf = 20
 params = {
     "canaritos": canaritos,
