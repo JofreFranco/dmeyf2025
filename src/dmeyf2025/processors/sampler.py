@@ -51,8 +51,8 @@ class SamplerProcessor:
         self.curve_ = curve
 
         if self.verbose:
-            print("Curva de sampling final:")
-            print(self.curve_)
+            logger.info("Curva de sampling final:")
+            logger.info(self.curve_)
 
     def _compute_uniform_curve(self):
         """
@@ -101,7 +101,6 @@ class SamplerProcessor:
 
         def new_curve(months):
             base = curve_fn(months).copy()
-
             for m, p in self.special_months.items():
                 base[months == m] = p
 
@@ -115,15 +114,19 @@ class SamplerProcessor:
         Las filas con label = 1 se conservan siempre.
         """
         df = df.copy()
-        
+        logger.info(f"Aplicando sampler, shape: {df.shape}")
         df_pos = df[df["label"] == 1]
         df_neg = df[df["label"] == 0]
-        
+        logger.info(f"Cantidad de casos negativos: {df_neg.shape}")
+        logger.info(f"Cantidad de casos postivos: {df_pos.shape}")
         months_neg = df_neg[self.month_col].values
         probs = self.curve_(months_neg)
         
         keep_neg = np.random.rand(len(df_neg)) < probs
         df_neg_sampled = df_neg[keep_neg]
+       
         out = pd.concat([df_pos, df_neg_sampled], ignore_index=True)
-        
+        logger.info(f"Dataset sampleado, shape: {out.shape}")
+        logger.info(f"Cantidad de casos negativos: {df_neg_sampled.shape}")
+        logger.info(f"Cantidad de casos postivos: {df_pos.shape}")
         return out
