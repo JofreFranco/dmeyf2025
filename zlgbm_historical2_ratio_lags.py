@@ -11,9 +11,7 @@ from config import *
 
 pd.set_option('display.max_columns', None)
 
-sampling_rate = 0.02
-experiment_name = "zlgbm-histfeatures2-ratiolags"
-experiment_name = f"{experiment_name}_c{canaritos}_gb{experiment_name}_s{sampling_rate}_u{(params['is_unbalance'])}"
+experiment_name = f'{experiment_name}_c{canaritos}_gb{experiment_name}_{sampling_conf["method"]}_{sampling_conf["target_sr"]}_p0{sampling_conf["p0"]}'
 
 logging.basicConfig(
     level=logging.INFO,
@@ -105,15 +103,10 @@ logger.info(f"Eliminando features que no se van a usar. La cantidad a eliminar e
 keep_cols = [col for col in df.columns if col not in features_to_drop]
 df = df[keep_cols]
 df = df[~df["foto_mes"].isna()]
-# ++++++++++++++
-# Preparar datos
-experiment_name = "zlgbm-histfeatures2-ratiolags"
-experiment_name = f"{experiment_name}_c{canaritos}_gb{experiment_name}_s{sampling_rate}_u{(params['is_unbalance'])}"
-logger.info("comenzando experimento %s", experiment_name)
-sampling_rate = 0.05
+
 start_time = time.time()
 logger.info("Preparando datos")
-X_train, y_train, w_train, X_eval, y_eval, w_eval, X_test, y_test = prepare_data(df, training_months, eval_month, test_month, get_features, weight, sampling_rate)
+X_train, y_train, w_train, X_eval, y_eval, w_eval, X_test, y_test = prepare_data(df, training_months, eval_month, test_month, get_features, weight, **sampler_conf)
 del df
 gc.collect()
 
@@ -128,18 +121,3 @@ train_set = lgb.Dataset(X_train, label=y_train)
 
 revs = train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames, bucket_path, debug_mode)
 
-
-X_train, y_train, w_train, X_eval, y_eval, w_eval, X_test, y_test = prepare_data(df, training_months, eval_month, test_month, get_features, weight, sampling_rate)
-
-gc.collect()
-
-print_memory_state()
-
-logger.info("Agregando canaritos")
-X_train = AddCanaritos(n_canaritos=canaritos).transform(X_train)
-X_eval = AddCanaritos(n_canaritos=canaritos).transform(X_eval) 
-logger.info("Datos pre procesados en tiempo: %s", time.time() - start_time)
-
-train_set = lgb.Dataset(X_train, label=y_train)
-
-revs = train_models_and_save_results(train_set,X_eval, w_eval, params, seeds, results_file, save_model, n_seeds, experiment_name, fieldnames, bucket_path, debug_mode)

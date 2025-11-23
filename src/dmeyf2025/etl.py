@@ -9,7 +9,7 @@ from dmeyf2025.processors.sampler import SamplerProcessor
 logger = logging.getLogger(__name__)
 
 
-def prepare_data(df, training_months, eval_month, test_month, get_features, weight, sampling_rate, **sampler_conf):
+def prepare_data(df, training_months, eval_month, test_month, get_features, weight, **sampler_conf):
     df["label"] = ((df["clase_ternaria"] == "BAJA+2") | (df["clase_ternaria"] == "BAJA+1")).astype(int)
     df["weight"] = np.array([weight[item] for item in df["clase_ternaria"]])
     df = df.drop(columns=["clase_ternaria"])
@@ -30,9 +30,10 @@ def prepare_data(df, training_months, eval_month, test_month, get_features, weig
     y_test, w_test, X_test = df_test["label"], df_test["weight"], df_test.drop(columns=["label", "weight"])
     del df_test
     gc.collect()
-
-    X_train, y_train = SamplerProcessor(sampling_rate, **sampler_conf).transform(df_train.drop(columns=["label"]), df_train["label"])
-    del df_train
+    sampler = SamplerProcessor(**sampler_conf)
+    df_sampled = sampler.transform(df_train)
+    X_train, y_train = df_sampled.drop(columns=["label"]), df_sampled["label"]
+    del df_train, df_sampled
     gc.collect()
     w_train = X_train["weight"]
     X_train = X_train.drop(columns=["weight"])
